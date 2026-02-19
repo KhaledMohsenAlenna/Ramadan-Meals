@@ -1,81 +1,75 @@
 import streamlit as st
 import requests
+import pandas as pd
 from datetime import datetime
 import pytz
 
-# 1. إعدادات الصفحة والتنسيق الجمالي (UI/UX)
-st.set_page_config(page_title="Ramadan Iftar - Zewail City", layout="centered", page_icon="🌙")
+# 1. إعدادات الصفحة
+st.set_page_config(page_title="Ramadan Iftar - Zewail City", layout="wide", page_icon="🌙")
 
-# كود لتغيير ألوان النصوص عشان تليق مع الخلفية الكحلي
-st.markdown("""
-    <style>
-    h1 { color: #f1c40f; text-align: center; text-shadow: 2px 2px 4px #000; } /* ذهبي للعنوان */
-    .stMarkdown p { color: #ffffff; text-align: center; font-size: 1.1em; } /* أبيض للوصف */
-    div.stButton > button:first-child { background-color: #f1c40f; color: #000; border-radius: 10px; width: 100%; }
-    </style>
-    """, unsafe_allow_html=True)
+# الروابط الهامة
+URL_SCRIPT = "حط_رابط_الاسكريبت_هنا"
+URL_SHEET_CSV = "حط_رابط_الـ_CSV_اللي_جبته_من_Publish_to_web_هنا"
 
-# 2. الرابط المباشر للصورة اللي أنت اخترتها
-img_url = "https://i.postimg.cc/c6NK7LMH/SL-112419-25350-04.jpg"
-st.image(img_url, use_container_width=True)
+# 2. التنسيق والصورة
+st.image("https://i.postimg.cc/c6NK7LMH/SL-112419-25350-04.jpg", use_container_width=True)
 
-# 3. بيانات الربط (تأكد أن هذا هو آخر رابط /exec عندك)
-url = "https://script.google.com/macros/s/AKfycbwR71E22SHUSUVV3PhTAk3ejtQ89oOlQRnV95efDbp1WAxCzjVWgf2YMoDuD8drHRLv/exec"
+# 3. نظام التبويبات (صفحة تسجيل / صفحة إدمن)
+tab1, tab2 = st.tabs(["📋 تسجيل الحجز", "🔐 لوحة التحكم (Admins)"])
 
-st.markdown("# 🌙 مبادرة إفطار صائم")
-st.markdown("كل عام وأنتم بخير - خدمة طلاب مدينة زويل المغتربين")
+# --- الصفحة الأولى: تسجيل الطلاب ---
+with tab1:
+    st.markdown("<h1 style='text-align: center;'>🌙 مبادرة إفطار صائم</h1>", unsafe_allow_html=True)
+    
+    # منطق الوقت
+    cairo_tz = pytz.timezone('Africa/Cairo')
+    now = datetime.now(cairo_tz)
+    is_open = (0 <= now.hour < 16) or (now.hour == 16 and now.minute < 30)
 
-# 4. لوحة تحكم الـ Admin (Sidebar)
-with st.sidebar:
-    st.header("⚙️ لوحة التحكم")
-    if st.checkbox("دخول المسؤولين"):
-        admin_pw = st.text_input("كلمة السر", type="password")
-        if admin_pw == "Zewail2026":
-            st.success("مرحباً يا أدمن")
-            del_email = st.text_input("إيميل الطالب للحذف")
-            if st.button("حذف الحجز الآن"):
-                with st.spinner("جاري الحذف من الشيت..."):
-                    res = requests.post(url, json={"action": "delete", "email": del_email})
-                    if res.status_code == 200: st.success("تم الحذف بنجاح")
-                    else: st.error("حدث خطأ في الحذف")
+    if not is_open:
+        st.error(f"⛔ انتهى وقت الحجز لليوم ({now.strftime('%I:%M %p')})")
+    else:
+        with st.form("iftar_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            name = col1.text_input("الاسم الثلاثي")
+            student_id = col2.text_input("University ID")
+            email = st.text_input("Zewail Email (@zewailcity.edu.eg)")
+            location = st.selectbox("مكان الاستلام", ["عماير القرية الكونية (عمو صبرى)", "الفيروز / المنطقة التالتة", "سكن الجامعة (Dorms)"])
+            gender = st.radio("النوع", ["ولد", "بنت"], horizontal=True)
+            room = st.text_input("رقم الغرفة (لسكان السكن)")
+            
+            submit = st.form_submit_button("تأكيد الحجز")
+            if submit:
+                if not email.lower().endswith("@zewailcity.edu.eg"):
+                    st.error("❌ سجل بإيميل الجامعة")
+                else:
+                    data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
+                    res = requests.post(URL_SCRIPT, json=data)
+                    if res.json().get("result") == "success":
+                        st.balloons(); st.success("تم الحجز بنجاح! رمضان كريم 🌙")
+                    elif res.json().get("message") == "duplicate":
+                        st.warning("⚠️ مسجل بالفعل لهذا اليوم")
 
-# 5. منطق الوقت (الفتح والقفل)
-cairo_tz = pytz.timezone('Africa/Cairo')
-now = datetime.now(cairo_tz)
-is_open = False
-if 0 <= now.hour < 16: is_open = True
-elif now.hour == 16 and now.minute < 30: is_open = True
-
-# 6. واجهة الحجز
-if not is_open:
-    st.error(f"⛔ انتهى وقت الحجز لليوم. الساعة الآن {now.strftime('%I:%M %p')}")
-else:
-    with st.form("iftar_form", clear_on_submit=True):
-        name = st.text_input("الاسم الثلاثي")
-        student_id = st.text_input("University ID")
-        email = st.text_input("Zewail Email (@zewailcity.edu.eg)")
+# --- الصفحة الثانية: لوحة تحكم الإدمن ---
+with tab2:
+    st.markdown("### 🛠️ إدارة الحجوزات")
+    password = st.text_input("كلمة السر", type="password")
+    if password == "Zewail2026":
+        st.success("مرحباً خالد")
         
-        locations = ["عماير القرية الكونية (عمو صبرى)", "الفيروز / المنطقة التالتة", "سكن الجامعة (Dorms)"]
-        location = st.selectbox("مكان الاستلام", locations)
-        
-        gender = st.radio("النوع", ["ولد", "بنت"], horizontal=True)
-        room = st.text_input("رقم الغرفة (لسكان السكن)")
-        
-        submit = st.form_submit_button("تأكيد حجز الوجبة")
+        # عرض الشيت
+        if st.button("🔄 تحديث وعرض كشف الأسماء"):
+            try:
+                df = pd.read_csv(URL_SHEET_CSV)
+                st.dataframe(df, use_container_width=True)
+            except:
+                st.error("تأكد من عمل Publish to web بصيغة CSV")
 
-        if submit:
-            if not email.lower().endswith("@zewailcity.edu.eg"):
-                st.error("❌ عذراً، يجب استخدام إيميل الجامعة")
+        # الحذف بالـ ID
+        del_id = st.text_input("ادخل الـ University ID للحذف")
+        if st.button("حذف الطالب"):
+            res = requests.post(URL_SCRIPT, json={"action": "delete", "student_id": del_id})
+            if res.json().get("result") == "success":
+                st.success(f"تم حذف الرقم {del_id}")
             else:
-                data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
-                with st.spinner("جاري تسجيل طلبك..."):
-                    try:
-                        res = requests.post(url, json=data)
-                        res_data = res.json()
-                        if res_data.get("result") == "success":
-                            st.balloons()
-                            st.success(f"تقبل الله يا {name.split()[0]}! تم حجز وجبتك بنجاح 🌙✨")
-                        elif res_data.get("message") == "duplicate":
-                            st.warning("⚠️ إيميلك مسجل بالفعل لهذا اليوم.")
-                    except:
-                        st.error("❌ مشكلة في الربط، تأكد من الـ Script URL.")
+                st.error("لم يتم العثور على الرقم")
