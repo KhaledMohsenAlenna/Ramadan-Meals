@@ -7,7 +7,7 @@ import pytz
 st.set_page_config(page_title="Ramadan Iftar", layout="centered", page_icon="🌙")
 
 # 2. Link el google script (Update this with your NEW /exec link)
-url = "https://script.google.com/a/macros/zewailcity.edu.eg/s/AKfycbwR71E22SHUSUVV3PhTAk3ejtQ89oOlQRnV95efDbp1WAxCzjVWgf2YMoDuD8drHRLv/exec"
+https://script.google.com/macros/s/AKfycbwR71E22SHUSUVV3PhTAk3ejtQ89oOlQRnV95efDbp1WAxCzjVWgf2YMoDuD8drHRLv/exec
 
 # 3. Header & Description
 st.markdown("<h1 style='text-align: center;'>🌙 مبادرة إفطار صائم</h1>", unsafe_allow_html=True)
@@ -94,3 +94,4 @@ else:
                             st.error("في مشكلة في السيرفر، جرب تاني كمان شوية.")
                     except:
                         st.error("مشكلة في الاتصال.. اتأكد من النت عندك أو إن سكريبت جوجل شغال.")
+
