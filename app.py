@@ -7,8 +7,7 @@ import pytz
 st.set_page_config(page_title="Ramadan Iftar", layout="centered", page_icon="🌙")
 
 # 2. Link el google script (Update this with your NEW /exec link)
-https://script.google.com/macros/s/AKfycbwR71E22SHUSUVV3PhTAk3ejtQ89oOlQRnV95efDbp1WAxCzjVWgf2YMoDuD8drHRLv/exec
-
+url = https://script.google.com/macros/s/AKfycbwR71E22SHUSUVV3PhTAk3ejtQ89oOlQRnV95efDbp1WAxCzjVWgf2YMoDuD8drHRLv/exec
 # 3. Header & Description
 st.markdown("<h1 style='text-align: center;'>🌙 مبادرة إفطار صائم</h1>", unsafe_allow_html=True)
 st.markdown("""
