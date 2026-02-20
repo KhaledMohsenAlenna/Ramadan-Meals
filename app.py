@@ -13,24 +13,24 @@ st.set_page_config(page_title="إدارة وجبات رمضان", layout="wide")
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyu51AdH5kuXUMHV2gVEHLguQNNNc0u8lnEFlDoB4czzAz7Le6rPBbSxUuCFjnrHen3/exec"
 URL_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqNEDayFNEgFoQqq-wF29BRkxF9u5YIrPYac54o3_hy3O5MvuQiQiwKKQ9oSlkx08JnXeN-mPu95Qk/pub?output=csv"
 
-# --- تصميم الواجهة (CSS) ---
+# --- تصميم الواجهة الاحترافي (CSS) ---
 st.markdown("""
     <style>
     .stApp { background-color: #0a192f; color: white; }
-    .main-title { color: #f1c40f; text-align: center; font-size: 3rem; font-weight: bold; margin-top: -50px; }
-    .stat-box { background: linear-gradient(145deg, #1e3a5f, #0d1b33); padding: 15px; border-radius: 15px; border: 1px solid #f1c40f; text-align: center; }
-    .stat-val { font-size: 2.2rem; font-weight: bold; color: #f1c40f; }
-    .stat-label { font-size: 1rem; color: #ecf0f1; }
-    .area-header { background: #f1c40f; color: #0a192f; padding: 10px; border-radius: 10px; font-weight: bold; text-align: center; margin: 20px 0; font-size: 1.2rem; }
-    .filter-card { background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border: 1px solid #3498db; margin-bottom: 20px; }
-    .boy-color { color: #3498db; }
-    .girl-color { color: #e91e63; }
+    .main-title { color: #f1c40f; text-align: center; font-size: 2.8rem; font-weight: bold; margin-top: -50px; }
+    .stat-card-mini { background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 10px; border-left: 5px solid #f1c40f; text-align: center; margin-bottom: 10px; }
+    .stat-val-mini { font-size: 1.5rem; font-weight: bold; display: block; }
+    .stat-label-mini { font-size: 0.9rem; color: #bdc3c7; }
+    .area-tag { background: #f1c40f; color: #0a192f; padding: 2px 8px; border-radius: 5px; font-weight: bold; font-size: 0.8rem; margin-bottom: 5px; display: inline-block; }
+    .boy-text { color: #3498db; }
+    .girl-text { color: #e91e63; }
+    .total-banner { background: linear-gradient(90deg, #f1c40f, #f39c12); color: #0a192f; padding: 10px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 1.2rem; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
 st.markdown('<div class="main-title">منظومة وجبات رمضان 🌙</div>', unsafe_allow_html=True)
 
-# الدوال المساعدة
+# --- الدوال المساعدة ---
 def send_code(receiver_email, code):
     try:
         sender = st.secrets["my_email"]
@@ -92,7 +92,7 @@ with tab1:
             else: st.warning("⚠️ تأكد من البيانات")
 
         if st.session_state.email_sent:
-            user_code = st.text_input("ادخل الكود")
+            user_code = st.text_input("ادخل الكود المستلم")
             if st.button("تفعيل واشتراك"):
                 if user_code == st.session_state.otp:
                     data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
@@ -100,14 +100,13 @@ with tab1:
                     if r.json().get("result") == "success": st.success("🎉 تم التفعيل والحجز!"); st.session_state.email_sent = False
                 else: st.error("❌ الكود خطأ")
 
-# --- التبويب الثاني: لوحة الإدارة المطورة (الإحصائيات الديناميكية) ---
+# --- التبويب الثاني: لوحة الإدارة المطورة ---
 with tab2:
     pw = st.text_input("كلمة سر الإدارة", type="password")
     if pw == "Zewail2026":
         if 'raw_data' not in st.session_state: st.session_state.raw_data = None
         
-        col_up, col_clr = st.columns(2)
-        if col_up.button("🔄 تحديث البيانات", use_container_width=True):
+        if st.button("🔄 تحديث وإحصاء البيانات", use_container_width=True):
             try:
                 df = pd.read_csv(URL_SHEET_CSV)
                 df.columns = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room', 'Status'][:len(df.columns)]
@@ -117,60 +116,57 @@ with tab2:
                 st.success("✅ تم التحديث")
             except: st.error("❌ فشل الجلب")
 
-        if col_clr.button("🗑️ مسح كشف اليوم بالكامل", use_container_width=True):
-            if st.checkbox("تأكيد مسح حجوزات اليوم"):
-                try:
-                    res = requests.post(URL_SCRIPT, json={"action": "clear_day"})
-                    if res.json().get("result") == "success":
-                        st.success("✅ تم مسح الكشف."); st.session_state.raw_data = None
-                    else: st.error("❌ فشل المسح")
-                except: st.error("❌ خطأ اتصال")
-
         if st.session_state.raw_data is not None:
             df = st.session_state.raw_data
             
-            st.markdown("---")
-            st.markdown('<div class="filter-card">', unsafe_allow_html=True)
-            st.write("### 🔍 تصفية وإحصائيات الكشف")
+            # --- الإحصائية الشاملة والسريعة ---
+            st.markdown(f'<div class="total-banner">إجمالي وجبات اليوم: {len(df)}</div>', unsafe_allow_html=True)
             
+            def get_counts(loc, gen):
+                return len(df[(df['Location'] == loc) & (df['Gender'] == gen)])
+
+            # عرض 6 كروت تفصيلية
+            row1_col1, row1_col2, row1_col3 = st.columns(3)
+            row2_col1, row2_col2, row2_col3 = st.columns(3)
+
+            # الكونية
+            row1_col1.markdown(f'<div class="stat-card-mini"><span class="area-tag">الكونية</span><span class="stat-label-mini boy-text">بنين</span><span class="stat-val-mini">{get_counts("عماير القرية الكونية", "ولد")}</span></div>', unsafe_allow_html=True)
+            row2_col1.markdown(f'<div class="stat-card-mini"><span class="area-tag">الكونية</span><span class="stat-label-mini girl-text">بنات</span><span class="stat-val-mini">{get_counts("عماير القرية الكونية", "بنت")}</span></div>', unsafe_allow_html=True)
+            
+            # الفيروز
+            row1_col2.markdown(f'<div class="stat-card-mini"><span class="area-tag">الفيروز</span><span class="stat-label-mini boy-text">بنين</span><span class="stat-val-mini">{get_counts("الفيروز / المنطقة التالتة", "ولد")}</span></div>', unsafe_allow_html=True)
+            row2_col2.markdown(f'<div class="stat-card-mini"><span class="area-tag">الفيروز</span><span class="stat-label-mini girl-text">بنات</span><span class="stat-val-mini">{get_counts("الفيروز / المنطقة التالتة", "بنت")}</span></div>', unsafe_allow_html=True)
+            
+            # Dorms
+            row1_col3.markdown(f'<div class="stat-card-mini"><span class="area-tag">Dorms</span><span class="stat-label-mini boy-text">بنين</span><span class="stat-val-mini">{get_counts("سكن الجامعة (Dorms)", "ولد")}</span></div>', unsafe_allow_html=True)
+            row2_col3.markdown(f'<div class="stat-card-mini"><span class="area-tag">Dorms</span><span class="stat-label-mini girl-text">بنات</span><span class="stat-val-mini">{get_counts("سكن الجامعة (Dorms)", "بنت")}</span></div>', unsafe_allow_html=True)
+
+            st.markdown("---")
+            # --- أدوات الفلترة والتحكم ---
             f1, f2 = st.columns(2)
             a_map = {"الكل": "الكل", "الكونية": "عماير القرية الكونية", "الفيروز": "الفيروز / المنطقة التالتة", "Dorms": "سكن الجامعة (Dorms)"}
-            sel_a = f1.selectbox("اختر المنطقة", list(a_map.keys()))
-            sel_g = f2.selectbox("اختر الجنس", ["الكل", "ولد", "بنت"])
+            sel_a = f1.selectbox("فلتر المنطقة للعرض", list(a_map.keys()))
+            sel_g = f2.selectbox("فلتر الجنس للعرض", ["الكل", "ولد", "بنت"])
             
-            # منطق الفلترة الديناميكي
             filtered_df = df.copy()
             if sel_a != "الكل": filtered_df = filtered_df[filtered_df['Location'] == a_map[sel_a]]
             if sel_g != "الكل": filtered_df = filtered_df[filtered_df['Gender'] == sel_g]
             
-            # --- عرض الإحصائيات بناءً على الفلتر المختار ---
-            st.write("#### 📊 ملخص النتائج الحالية:")
-            count_total = len(filtered_df)
-            count_boys = len(filtered_df[filtered_df['Gender'] == 'ولد'])
-            count_girls = len(filtered_df[filtered_df['Gender'] == 'بنت'])
-            
-            s1, s2, s3 = st.columns(3)
-            s1.markdown(f'<div class="stat-box"><span class="stat-label">👦 بنين</span><br><span class="stat-val boy-color">{count_boys}</span></div>', unsafe_allow_html=True)
-            s2.markdown(f'<div class="stat-box"><span class="stat-label">👧 بنات</span><br><span class="stat-val girl-color">{count_girls}</span></div>', unsafe_allow_html=True)
-            s3.markdown(f'<div class="stat-box"><span class="stat-label">📍 الإجمالي</span><br><span class="stat-val">{count_total}</span></div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            # عرض الجدول المفلتر
+            st.write(f"✅ كشف مفصل (العدد: {len(filtered_df)})")
             st.dataframe(filtered_df, use_container_width=True)
 
             st.markdown("---")
-            st.write("### ✅ التحكم بالـ ID")
-            target_id = st.text_input("ادخل الـ ID")
-            c_m, c_d = st.columns(2)
+            # --- التحكم بالـ ID ومسح اليوم ---
+            st.write("### 🛠️ عمليات إدارية")
+            t_id = st.text_input("ادخل الـ ID للإجراء")
+            c_m, c_d, c_clr = st.columns(3)
             
-            if c_m.button("تحديد كـ (مستلم) ✅", use_container_width=True):
-                if target_id:
-                    res = requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": target_id})
-                    if res.json().get("result") == "success": 
-                        st.success(f"تم التحديد {target_id}"); st.session_state.raw_data = None
+            if c_m.button("✅ تحديد استلام", use_container_width=True):
+                if t_id: requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": t_id}); st.session_state.raw_data = None
             
-            if c_d.button("حذف الحجز نهائياً ❌", use_container_width=True):
-                if target_id:
-                    res = requests.post(URL_SCRIPT, json={"action": "delete_student", "student_id": target_id})
-                    if res.json().get("result") == "success": 
-                        st.warning(f"تم حذف {target_id}"); st.session_state.raw_data = None
+            if c_d.button("❌ حذف حجز", use_container_width=True):
+                if t_id: requests.post(URL_SCRIPT, json={"action": "delete_student", "student_id": t_id}); st.session_state.raw_data = None
+            
+            if c_clr.button("🗑️ مسح كشف اليوم", use_container_width=True):
+                if st.checkbox("تأكيد مسح الكل"):
+                    requests.post(URL_SCRIPT, json={"action": "clear_day"}); st.session_state.raw_data = None
