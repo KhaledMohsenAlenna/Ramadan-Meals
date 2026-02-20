@@ -10,11 +10,11 @@ import random
 # إعدادات الصفحة
 st.set_page_config(page_title="منظومة وجبات رمضان", layout="wide")
 
-# الروابط - (تأكد من تحديث URL_SCRIPT بعد الـ Deployment الجديد)
-URL_SCRIPT = "رابط_السكريبت_الجديد_هنا"
-URL_SHEET_CSV = "رابط_CSV_الخاص_بالشيت_هنا"
+# تأكد من وضع الروابط داخل علامات التنصيص بشكل صحيح
+URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyu51AdH5kuXUMHV2gVEHLguQNNNc0u8lnEFlDoB4czzAz7Le6rPBbSxUuCFjnrHen3/exec"
+URL_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqNEDayFNEgFoQqq-wF29BRkxF9u5YIrPYac54o3_hy3O5MvuQiQiwKKQ9oSlkx08JnXeN-mPu95Qk/pub?output=csv"
 
-# تنسيق CSS
+# تنسيق الواجهة
 st.markdown("""
     <style>
     .stApp { background-color: #0a192f; color: white; }
@@ -28,6 +28,7 @@ st.markdown("""
 
 st.markdown('<div class="main-title">منظومة وجبات رمضان 🌙</div>', unsafe_allow_html=True)
 
+# دوال الربط والإرسال
 def send_code(receiver_email, code):
     try:
         sender = st.secrets["my_email"]
@@ -42,37 +43,40 @@ def send_code(receiver_email, code):
         return "success"
     except Exception as e: return str(e)
 
+def load_data():
+    return pd.read_csv(URL_SHEET_CSV)
+
 def is_email_verified(email_to_check):
     try:
-        df_all = pd.read_csv(URL_SHEET_CSV)
+        df_all = load_data()
         verified_emails = df_all.iloc[:, 2].astype(str).str.strip().unique()
         return email_to_check.strip() in verified_emails
     except: return False
 
 tab1, tab2 = st.tabs(["📝 تسجيل حجز جديد", "📊 لوحة الإدارة الذكية"])
 
+# --- واجهة التسجيل ---
 with tab1:
     cairo_tz = pytz.timezone('Africa/Cairo')
     now = datetime.now(cairo_tz)
     current_minutes = now.hour * 60 + now.minute
-    close_minutes = 16 * 60 + 30 # الساعة 4:30 عصراً
+    close_minutes = 16 * 60 + 30
     is_open = 0 <= current_minutes < close_minutes
 
     if not is_open:
-        st.error(f"⛔ الحجز مغلق حالياً. يفتح يومياً من 12 صباحاً حتى 4:30 عصراً.")
+        st.error(f"⛔ الحجز مغلق حالياً. يفتح يومياً حتى 4:30 عصراً.")
     else:
         if 'otp' not in st.session_state: st.session_state.otp = ""
         if 'email_sent' not in st.session_state: st.session_state.email_sent = False
 
         c1, c2 = st.columns(2)
-        name = c1.text_input("الاسم الثلاثي")
-        student_id = c2.text_input("University ID")
-        email = st.text_input("الإيميل الجامعي الرسمي")
+        name, student_id = c1.text_input("الاسم"), c2.text_input("ID")
+        email = st.text_input("إيميل الجامعة الرسمي")
         location = st.selectbox("مكان الاستلام", ["عماير القرية الكونية", "الفيروز / المنطقة التالتة", "سكن الجامعة (Dorms)"])
         gender = st.radio("الجنس", ["ولد", "بنت"], horizontal=True)
         room = st.text_input("رقم الغرفة")
 
-        if st.button("تأكيد الحجز 🚀", use_container_width=True):
+        if st.button("حجز الوجبة 🚀", use_container_width=True):
             if name and student_id and email.lower().endswith("@zewailcity.edu.eg"):
                 if is_email_verified(email):
                     data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
@@ -80,41 +84,41 @@ with tab1:
                 else:
                     st.session_state.otp = str(random.randint(1000, 9999))
                     send_code(email, st.session_state.otp)
-                    st.session_state.email_sent = True; st.info("✅ تم إرسال كود التأكيد.")
-            else: st.warning("⚠️ يرجى إكمال البيانات")
+                    st.session_state.email_sent = True; st.info("✅ تم إرسال الكود.")
+            else: st.warning("⚠️ أكمل البيانات")
 
         if st.session_state.email_sent:
             user_code = st.text_input("ادخل الكود")
-            if st.button("تفعيل الحجز"):
+            if st.button("تفعيل"):
                 if user_code == st.session_state.otp:
                     data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
-                    requests.post(URL_SCRIPT, json=data); st.success("🎉 تم الحجز بنجاح!"); st.session_state.email_sent = False
+                    requests.post(URL_SCRIPT, json=data); st.success("🎉 تم الحجز!"); st.session_state.email_sent = False
                 else: st.error("❌ الكود خطأ")
 
+# --- واجهة الإدارة ---
 with tab2:
     if st.text_input("كلمة السر", type="password") == "Zewail2026":
-        if st.button("🔄 تحديث وإحصاء البيانات", use_container_width=True):
-            df = pd.read_csv(URL_SHEET_CSV)
+        if st.button("🔄 تحديث البيانات", use_container_width=True):
+            df = load_data()
             df.columns = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room', 'Status'][:len(df.columns)]
             st.session_state.raw_data = df
         
         if 'raw_data' in st.session_state:
             df = st.session_state.raw_data
-            st.markdown(f'<div class="total-banner">إجمالي وجبات اليوم: {len(df)}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="total-banner">إجمالي الوجبات: {len(df)}</div>', unsafe_allow_html=True)
             
             def get_c(loc, gen): return len(df[(df['Location'] == loc) & (df['Gender'] == gen)])
             
-            # عرض الإحصائيات الـ 6 المفصلة
             r1, r2 = st.columns(3), st.columns(3)
             locs = [("عماير القرية الكونية", "الكونية"), ("الفيروز / المنطقة التالتة", "الفيروز"), ("سكن الجامعة (Dorms)", "Dorms")]
             for i, (full, short) in enumerate(locs):
                 r1[i].markdown(f'<div class="stat-card-mini"><span class="area-tag">{short}</span><br><span class="boy-text">بنين: {get_c(full, "ولد")}</span></div>', unsafe_allow_html=True)
                 r2[i].markdown(f'<div class="stat-card-mini"><span class="area-tag">{short}</span><br><span class="girl-text">بنات: {get_c(full, "بنت")}</span></div>', unsafe_allow_html=True)
 
-            # أدوات التحكم
             st.markdown("---")
-            t_id = st.text_input("ادخل الـ ID للإجراء")
+            t_id = st.text_input("ادخل الـ ID")
             c_m, c_d, c_clr = st.columns(3)
-            if c_m.button("✅ تأكيد استلام"): requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": t_id})
-            if c_d.button("❌ حذف حجز"): requests.post(URL_SCRIPT, json={"action": "delete_student", "student_id": t_id})
+            if c_m.button("✅ استلام"): requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": t_id})
+            if c_d.button("❌ حذف"): requests.post(URL_SCRIPT, json={"action": "delete_student", "student_id": t_id})
             if c_clr.button("🗑️ مسح الكل"): requests.post(URL_SCRIPT, json={"action": "clear_day"})
+            st.dataframe(df, use_container_width=True)
