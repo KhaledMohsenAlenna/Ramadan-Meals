@@ -124,14 +124,17 @@ with tab1:
                     
                     with st.spinner("جاري الحجز..."):
                         res = requests.post(URL_SCRIPT, json=data)
-                        res_json = res.json()
                         
-                        if res_json.get("result") == "success":
-                            st.balloons()
-                            st.success("تم تسجيل وجبتك بنجاح")
-                            st.session_state.email_sent = False
-                        elif res_json.get("message") == "duplicate":
-                            st.warning("الرقم الجامعي أو الإيميل سجل قبل كدا النهاردة")
+                        try:
+                            res_json = res.json()
+                            if res_json.get("result") == "success":
+                                st.balloons()
+                                st.success("تم تسجيل وجبتك بنجاح")
+                                st.session_state.email_sent = False
+                            elif res_json.get("message") == "duplicate":
+                                st.warning("الرقم الجامعي أو الإيميل سجل قبل كدا النهاردة")
+                        except ValueError:
+                            st.error("⚠️ مشكلة في الرد من جوجل. اتأكد من تحديث السكريبت.")
                 else:
                     st.error("الكود غلط، راجع الايميل تاني")
 
@@ -174,4 +177,3 @@ with tab2:
                         st.error("فشل الاتصال بجوجل شيت")
             else:
                 st.warning("اكتب الرقم الاول")
-
