@@ -10,17 +10,19 @@ import random
 # إعداد الصفحة
 st.set_page_config(page_title="وجبات رمضان", layout="wide")
 
-# الرابط الخاص بك (تأكد من تحديثه دائماً لو عملت New Deployment)
+# الروابط الخاصة بك
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyu51AdH5kuXUMHV2gVEHLguQNNNc0u8lnEFlDoB4czzAz7Le6rPBbSxUuCFjnrHen3/exec"
 URL_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqNEDayFNEgFoQqq-wF29BRkxF9u5YIrPYac54o3_hy3O5MvuQiQiwKKQ9oSlkx08JnXeN-mPu95Qk/pub?output=csv"
 
-# تنسيق CSS
+# تنسيق CSS محسن للـ Dashboard
 st.markdown("""
     <style>
     .stApp { background-color: #0a192f; color: white; }
     .main-title { color: #f1c40f; text-align: center; font-size: 3rem; font-weight: bold; margin-top: -50px; }
     .sub-title { color: #ffffff; text-align: center; font-size: 1.8rem; margin-bottom: 30px; }
-    .stat-card { background-color: #1a2a4a; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #f1c40f; }
+    .stat-card { background-color: #1a2a4a; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #f1c40f; margin-bottom: 10px; }
+    .gender-card { border: 1px solid #3498db; background-color: #0d2137; }
+    h2, h3, h6 { margin: 0; padding: 0; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -68,7 +70,7 @@ with tab1:
             if st.button("إرسال كود التأكيد"):
                 if name and student_id and email.lower().endswith("@zewailcity.edu.eg"):
                     st.session_state.otp = str(random.randint(1000, 9999))
-                    with st.spinner("جاري الإرسال..."):
+                    with st.spinner("جاري إرسال الكود..."):
                         res = send_code(email, st.session_state.otp)
                         if res == "success":
                             st.session_state.email_sent = True
@@ -96,28 +98,37 @@ with tab1:
 with tab2:
     pw = st.text_input("كلمة السر للمسؤول", type="password")
     if pw == "Zewail2026":
-        st.write("### 📊 إحصائيات الوجبات الحالية")
+        st.write("### 📊 إحصائيات الوجبات والتوزيع")
         
-        if st.button("🔄 تحديث البيانات"):
+        if st.button("🔄 تحديث الإحصائيات والجدول"):
             try:
                 df = pd.read_csv(URL_SHEET_CSV)
                 
-                # حساب الإحصائيات
-                total_meals = len(df)
-                # استخدام اسم العمود الصحيح بناءً على الترتيب (العمود الخامس E هو مكان الاستلام)
-                # لو الشيت مفيهوش عناوين واضحة، بنستخدم index الأعمدة
-                stats = df.iloc[:, 4].value_counts() # العمود رقم 5 (index 4) هو مكان الاستلام
+                # 1. إحصائيات المناطق (العمود رقم 5 - Index 4)
+                loc_stats = df.iloc[:, 4].value_counts()
                 
-                # عرض الإحصائيات في كروت
-                col_total, col1, col2, col3 = st.columns(4)
-                with col_total:
-                    st.markdown(f'<div class="stat-card"><h3>الإجمالي</h3><h2>{total_meals}</h2></div>', unsafe_allow_html=True)
-                with col1:
-                    st.markdown(f'<div class="stat-card"><h6>القرية</h6><h2>{stats.get("عماير القرية الكونية", 0)}</h2></div>', unsafe_allow_html=True)
-                with col2:
-                    st.markdown(f'<div class="stat-card"><h6>الفيروز</h6><h2>{stats.get("الفيروز / المنطقة التالتة", 0)}</h2></div>', unsafe_allow_html=True)
-                with col3:
-                    st.markdown(f'<div class="stat-card"><h6>السكن</h6><h2>{stats.get("سكن الجامعة (Dorms)", 0)}</h2></div>', unsafe_allow_html=True)
+                # 2. إحصائيات النوع (العمود رقم 6 - Index 5)
+                gender_stats = df.iloc[:, 5].value_counts()
+                
+                # الصف الأول: إحصائيات عامة والنوع
+                st.write("#### الإحصائيات العامة والنوع")
+                c_total, c_boys, c_girls = st.columns(3)
+                with c_total:
+                    st.markdown(f'<div class="stat-card"><h3>الإجمالي</h3><h2>{len(df)}</h2></div>', unsafe_allow_html=True)
+                with c_boys:
+                    st.markdown(f'<div class="stat-card gender-card"><h3>بنين 👦</h3><h2>{gender_stats.get("ولد", 0)}</h2></div>', unsafe_allow_html=True)
+                with c_girls:
+                    st.markdown(f'<div class="stat-card gender-card"><h3>بنات 👧</h3><h2>{gender_stats.get("بنت", 0)}</h2></div>', unsafe_allow_html=True)
+
+                # الصف الثاني: توزيع المناطق (بالمسميات الجديدة)
+                st.write("#### توزيع الوجبات حسب المنطقة")
+                c_konia, c_fayrouz, c_dorms = st.columns(3)
+                with c_konia:
+                    st.markdown(f'<div class="stat-card"><h6>الكونية</h6><h2>{loc_stats.get("عماير القرية الكونية", 0)}</h2></div>', unsafe_allow_html=True)
+                with c_fayrouz:
+                    st.markdown(f'<div class="stat-card"><h6>الفيروز</h6><h2>{loc_stats.get("الفيروز / المنطقة التالتة", 0)}</h2></div>', unsafe_allow_html=True)
+                with c_dorms:
+                    st.markdown(f'<div class="stat-card"><h6>Dorms</h6><h2>{loc_stats.get("سكن الجامعة (Dorms)", 0)}</h2></div>', unsafe_allow_html=True)
                 
                 st.markdown("---")
                 st.write("#### كشف الأسماء التفصيلي")
@@ -135,6 +146,6 @@ with tab2:
                     try:
                         res = requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": rec_id})
                         if res.json().get("result") == "success":
-                            st.success(f"✅ تم تظليل الطالب {rec_id} بنجاح كـ 'مستلم'.")
+                            st.success(f"✅ تم تظليل الطالب {rec_id} بنجاح.")
                         else: st.error("الرقم الجامعي غير موجود")
                     except: st.error("فشل الاتصال")
