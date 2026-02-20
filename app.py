@@ -7,7 +7,7 @@ import smtplib
 from email.mime.text import MIMEText
 import random
 
-# إعدادات الصفحة
+# إعدادات الصفحة الاحترافية
 st.set_page_config(page_title="منظومة وجبات رمضان", layout="wide")
 
 # الروابط الخاصة بك
@@ -67,7 +67,6 @@ with tab1:
         email = st.text_input("الإيميل الجامعي الرسمي")
         
         col3, col4 = st.columns(2)
-        # الأسماء هنا لازم تطابق اللي في الشيت بالظبط
         location = col3.selectbox("مكان الاستلام", ["عماير القرية الكونية", "الفيروز / المنطقة التالتة", "سكن الجامعة (Dorms)"])
         gender = col4.radio("الجنس", ["ولد", "بنت"], horizontal=True)
         room = st.text_input("رقم الغرفة (للسكن فقط)")
@@ -93,9 +92,7 @@ with tab1:
                         try:
                             r = requests.post(URL_SCRIPT, json=data, timeout=25)
                             if r.json().get("result") == "success":
-                                st.balloons()
-                                st.success("🎉 تم الحجز بنجاح!")
-                                st.session_state.email_sent = False
+                                st.balloons(); st.success("🎉 تم الحجز بنجاح!"); st.session_state.email_sent = False
                             else: st.warning("⚠️ أنت مسجل بالفعل لهذا اليوم")
                         except: st.error("❌ مشكلة في الاتصال بالسيرفر")
                 else: st.error("❌ الكود غير صحيح")
@@ -107,7 +104,6 @@ with tab2:
         if st.button("🔄 تحديث الإحصائيات والكشوفات", use_container_width=True):
             try:
                 df = pd.read_csv(URL_SHEET_CSV)
-                # تسمية الأعمدة لضمان التوافق (8 أعمدة حسب الشيت بتاعك)
                 all_cols = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room', 'Status']
                 df.columns = all_cols[:len(df.columns)]
                 
@@ -117,7 +113,6 @@ with tab2:
 
                 st.markdown(f'<div class="total-banner">إجمالي الحجوزات: {len(df)} وجبة</div>', unsafe_allow_html=True)
 
-                # دالة عرض إحصائيات كل منطقة
                 def show_stats(loc_val, title):
                     area = df[df['Location'] == loc_val]
                     b = len(area[area['Gender'] == 'ولد'])
