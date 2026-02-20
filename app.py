@@ -7,173 +7,101 @@ import smtplib
 from email.mime.text import MIMEText
 import random
 
-st.set_page_config(page_title="وجبات رمضان - مدينة زويل", layout="wide")
+# --- إعدادات الصفحة والروابط ---
+st.set_page_config(page_title="وجبات رمضان - زويل", layout="wide", page_icon="🌙")
 
+# الروابط الخاصة بك
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwR71E22SHUSUVV3PhTAk3ejtQ89oOlQRnV95efDbp1WAxCzjVWgf2YMoDuD8drHRLv/exec"
 URL_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqNEDayFNEgFoQqq-wF29BRkxF9u5YIrPYac54o3_hy3O5MvuQiQiwKKQ9oSlkx08JnXeN-mPu95Qk/pub?output=csv"
 
-# css style
-st.markdown("""
-    <style>
-    .stApp { background-color: #0a192f; }
-    .main-title { color: #f1c40f; text-align: center; font-size: 3rem; margin-top: -50px;}
-    .sub-title { color: #ffffff; text-align: center; font-size: 1.5rem; margin-bottom: 30px;}
-    </style>
-    """, unsafe_allow_html=True)
+# --- بيانات الـ OTP (تأكد من مطابقة الإيميل والباسورد المولد) ---
+SENDER_EMAIL = "s-khaled.alenna@zewailcity.edu.eg" 
+APP_PASSWORD = "jsse uiax musb xwhh"  # الكود اللي أنت طلعته الآن
 
-st.markdown('<div class="main-title">وجبات رمضان</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">كل عام وأنتم بخير</div>', unsafe_allow_html=True)
-
-# send email
-def send_code(receiver_email, code):
-    sender = st.secrets["my_email"]
-    password = st.secrets["my_password"]
-    
-    msg = MIMEText("كود التأكيد الخاص بك هو: " + str(code))
-    msg['Subject'] = 'تأكيد حجز الإفطار - مدينة زويل'
-    msg['From'] = sender
-    msg['To'] = receiver_email
-    
+# دالة إرسال الإيميل (SMTP)
+def send_otp(receiver, code):
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(sender, password)
-        server.sendmail(sender, receiver_email, msg.as_string())
-        server.quit()
+        msg = MIMEText(f"كود التأكيد الخاص بك لحجز وجبة رمضان هو: {code}")
+        msg['Subject'] = 'تأكيد حجز وجبة إفطار'
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = receiver
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(SENDER_EMAIL, APP_PASSWORD)
+            server.send_message(msg)
         return True
-    except Exception as e:
-        return False
+    except: return False
 
-tab1, tab2 = st.tabs(["تسجيل حجز جديد", "لوحة تحكم المسؤولين"])
+# دالة تحميل البيانات بالكاش (لتحسين الأداء)
+@st.cache_data(ttl=60)
+def load_data(url):
+    df = pd.read_csv(url)
+    if len(df.columns) >= 8:
+        df.columns = ["التاريخ", "الاسم", "الإيميل", "ID", "المكان", "النوع", "الغرفة", "الحالة"]
+    return df
+
+# --- واجهة الموقع ---
+st.markdown("<h1 style='text-align: center; color: #f1c40f;'>وجبات رمضان</h1>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: white;'>كل عام وأنتم بخير</h3>", unsafe_allow_html=True)
+
+if 'step' not in st.session_state: st.session_state.step = 1
+
+tab1, tab2 = st.tabs(["📝 تسجيل حجز جديد", "🔐 لوحة الإدارة الذكية"])
 
 with tab1:
-    cairo_tz = pytz.timezone('Africa/Cairo')
-    now = datetime.now(cairo_tz)
-    
-    is_open = False
-    if now.hour >= 0 and now.hour < 16:
-        is_open = True
-    elif now.hour == 16 and now.minute < 30:
-        is_open = True
-
-    if is_open == False:
-        st.error("انتهى وقت الحجز لليوم")
-    else:
-        # variables
-        if 'otp' not in st.session_state:
-            st.session_state.otp = ""
-        if 'email_sent' not in st.session_state:
-            st.session_state.email_sent = False
-
-        name = st.text_input("الاسم الثلاثي")
-        student_id = st.text_input("University ID")
-        email = st.text_input("Zewail Email (@zewailcity.edu.eg)")
-        
-        locations = ["عماير القرية الكونية", "الفيروز / المنطقة التالتة", "سكن الجامعة (Dorms)"]
-        location = st.selectbox("مكان الاستلام", locations)
-        
-        col1, col2 = st.columns(2)
-        with col1:
+    if st.session_state.step == 1:
+        with st.form("main_form"):
+            name = st.text_input("الاسم الثلاثي")
+            sid = st.text_input("University ID")
+            email = st.text_input("الإيميل الجامعي الرسمي")
+            loc = st.selectbox("مكان الاستلام", ["عماير القرية الكونية", "الفيروز", "سكن الجامعة (Dorms)"])
             gender = st.radio("النوع", ["ولد", "بنت"], horizontal=True)
-        with col2:
             room = st.text_input("رقم الغرفة (للسكن فقط)")
-        
-        # send code
-        if st.session_state.email_sent == False:
-            if st.button("إرسال كود التأكيد"):
-                if name == "" or student_id == "" or email == "":
-                    st.warning("اكتب كل البيانات الاول")
-                elif email.lower().endswith("@zewailcity.edu.eg") == False:
-                    st.error("لازم تستخدم ايميل الجامعة")
-                else:
-                    generated_otp = random.randint(1000, 9999)
-                    st.session_state.otp = str(generated_otp)
-                    
-                    with st.spinner("جاري ارسال الكود..."):
-                        is_sent = send_code(email, st.session_state.otp)
-                        if is_sent == True:
-                            st.session_state.email_sent = True
-                            st.rerun()
-                        else:
-                            st.error("فشل الارسال، راجع اعدادات الايميل")
-        
-        # confirm code
-        if st.session_state.email_sent == True:
-            st.success("✅ الكود اتبعت للايميل بتاعك")
             
-            st.info("""
-            💡 **تنبيه هام:** غالباً هتلاقي كود التأكيد وصل في مجلد الـ **Spam** (الرسائل غير المرغوب فيها).
-            
-            📞 **للتواصل والمساعدة:**
-            * 01025687330
-            * 01094541437 (+20)
-            * 01017194365 (+20)
-            """)
-            
-            user_otp = st.text_input("اكتب الكود هنا")
-            
-            if st.button("تأكيد وحجز الوجبة"):
-                if user_otp == st.session_state.otp:
-                    data = {
-                        "name": name, 
-                        "id": student_id, 
-                        "email": email, 
-                        "location": location, 
-                        "gender": gender, 
-                        "room": room
+            if st.form_submit_button("إرسال كود التأكيد"):
+                if email.lower().endswith("@zewailcity.edu.eg"):
+                    st.session_state.otp = str(random.randint(1000, 9999))
+                    st.session_state.temp_data = {
+                        "name": name, "id": sid, "email": email, 
+                        "location": loc, "gender": gender, "room": room
                     }
-                    
-                    with st.spinner("جاري الحجز..."):
-                        res = requests.post(URL_SCRIPT, json=data)
-                        
-                        try:
-                            res_json = res.json()
-                            if res_json.get("result") == "success":
-                                st.balloons()
-                                st.success("تم تسجيل وجبتك بنجاح")
-                                st.session_state.email_sent = False
-                            elif res_json.get("message") == "duplicate":
-                                st.warning("الرقم الجامعي أو الإيميل سجل قبل كدا النهاردة")
-                        except ValueError:
-                            st.error("⚠️ مشكلة في الرد من جوجل. اتأكد من تحديث السكريبت.")
-                else:
-                    st.error("الكود غلط، راجع الايميل تاني")
+                    with st.spinner("جاري إرسال الكود..."):
+                        if send_otp(email, st.session_state.otp):
+                            st.session_state.step = 2
+                            st.rerun()
+                        else: st.error("فشل إرسال الكود، تأكد من إعدادات الحساب")
+                else: st.error("يرجى استخدام إيميل الجامعة الرسمي")
+
+    elif st.session_state.step == 2:
+        u_code = st.text_input("أدخل الكود المكون من 4 أرقام المبعوث لإيميلك")
+        if st.button("تأكيد الحجز النهائي"):
+            if u_code == st.session_state.otp:
+                with st.spinner("جاري التسجيل..."):
+                    requests.post(URL_SCRIPT, json=st.session_state.temp_data)
+                    st.balloons(); st.success("تم الحجز بنجاح! رمضان كريم 🌙")
+                    load_data.clear()
+                    st.session_state.step = 1
+            else: st.error("الكود غير صحيح")
 
 with tab2:
-    st.write("لوحة تحكم المسؤولين")
-    pw = st.text_input("كلمة السر", type="password")
-    
-    if pw == "Zewail2026":
-        st.success("اهلا بك")
-        
-        if st.button("عرض الجدول"):
-            try:
-                df = pd.read_csv(URL_SHEET_CSV)
-                st.write("عدد المسجلين: " + str(len(df)))
-                st.dataframe(df, use_container_width=True)
-            except Exception as e:
-                st.error("مشكلة في تحميل الشيت")
-
-        st.write("حذف بيانات طالب")
-        del_id = st.text_input("ادخل ال ID للحذف")
-        
-        if st.button("تأكيد الحذف"):
-            if del_id != "":
-                del_data = {"action": "delete", "student_id": del_id}
-                with st.spinner("جاري التواصل مع الشيت..."):
-                    try:
-                        res = requests.post(URL_SCRIPT, json=del_data)
-                        
-                        # catch json decode error
-                        try:
-                            res_json = res.json()
-                            if res_json.get("result") == "success":
-                                st.success("تم مسح الطالب بنجاح")
-                            else:
-                                st.error("ال ID مش موجود في الحجوزات")
-                        except ValueError:
-                            st.error("⚠️ جوجل سكريبت رد بـ HTML. اتأكد إنك عملت New Deployment للكود في جوجل.")
-                            
-                    except Exception as e:
-                        st.error("فشل الاتصال بجوجل شيت")
-            else:
-                st.warning("اكتب الرقم الاول")
+    if st.text_input("كلمة سر الإدمن", type="password") == "Zewail2026":
+        try:
+            df = load_data(URL_SHEET_CSV)
+            st.markdown("### 📊 إحصائيات التوزيع اليومية")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("إجمالي الوجبات", len(df))
+            # استخدام الفلترة الذكية لعرض الأعداد لكل منطقة
+            counts = df.iloc[:, 4].value_counts()
+            c2.metric("العماير", counts.get("عماير القرية الكونية", 0))
+            c3.metric("الفيروز", counts.get("الفيروز", 0))
+            c4.metric("السكن", counts.get("سكن الجامعة (Dorms)", 0))
+            
+            st.markdown("---")
+            st.dataframe(df, use_container_width=True)
+            
+            # قسم الحذف أو التعديل
+            update_id = st.text_input("ادخل الـ ID للتعديل")
+            if st.button("✔️ تم الاستلام"):
+                requests.post(URL_SCRIPT, json={"action": "update_status", "student_id": update_id, "status": "تم الاستلام ✅"})
+                load_data.clear(); st.rerun()
+        except:
+            st.warning("لا توجد بيانات مسجلة حالياً.")
