@@ -7,14 +7,14 @@ import smtplib
 from email.mime.text import MIMEText
 import random
 
-# إعدادات الصفحة
+# --- إعدادات الصفحة ---
 st.set_page_config(page_title="منظومة وجبات رمضان", layout="wide")
 
 # الروابط
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyu51AdH5kuXUMHV2gVEHLguQNNNc0u8lnEFlDoB4czzAz7Le6rPBbSxUuCFjnrHen3/exec"
 URL_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqNEDayFNEgFoQqq-wF29BRkxF9u5YIrPYac54o3_hy3O5MvuQiQiwKKQ9oSlkx08JnXeN-mPu95Qk/pub?output=csv"
 
-# تنسيق CSS احترافي
+# --- التنسيق (CSS) ---
 st.markdown("""
     <style>
     .stApp { background-color: #0a192f; color: white; }
@@ -31,7 +31,7 @@ st.markdown("""
 st.markdown('<div class="main-title">منظومة وجبات رمضان 🌙</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">نتمنى لكم صوماً مقبولاً وإفطاراً شهياً</div>', unsafe_allow_html=True)
 
-# دالة إرسال الإيميل
+# --- دالة إرسال الإيميل ---
 def send_code(receiver_email, code):
     try:
         sender = st.secrets["my_email"]
@@ -47,8 +47,19 @@ def send_code(receiver_email, code):
     except Exception as e:
         return str(e)
 
+# --- دالة التحقق من تسجيل الإيميل سابقاً ---
+def is_email_verified(email_to_check):
+    try:
+        df_all = pd.read_csv(URL_SHEET_CSV)
+        # التأكد من وجود عمود الإيميلات (العمود رقم 3 - Index 2)
+        verified_emails = df_all.iloc[:, 2].astype(str).str.strip().unique()
+        return email_to_check.strip() in verified_emails
+    except:
+        return False
+
 tab1, tab2 = st.tabs(["📝 تسجيل حجز جديد", "📊 لوحة الإدارة الذكية"])
 
+# --- التبويب الأول: التسجيل (المنطق الجديد) ---
 with tab1:
     cairo_tz = pytz.timezone('Africa/Cairo')
     now = datetime.now(cairo_tz)
@@ -59,6 +70,7 @@ with tab1:
     else:
         if 'otp' not in st.session_state: st.session_state.otp = ""
         if 'email_sent' not in st.session_state: st.session_state.email_sent = False
+        if 'verified_user' not in st.session_state: st.session_state.verified_user = False
 
         col1, col2 = st.columns(2)
         name = col1.text_input("الاسم الثلاثي")
@@ -70,97 +82,85 @@ with tab1:
         gender = col4.radio("الجنس", ["ولد", "بنت"], horizontal=True)
         room = st.text_input("رقم الغرفة (للسكن فقط)")
 
-        if not st.session_state.email_sent:
-            if st.button("إرسال كود التأكيد 📩", use_container_width=True):
-                if name and student_id and email.lower().endswith("@zewailcity.edu.eg"):
-                    st.session_state.otp = str(random.randint(1000, 9999))
-                    with st.spinner("جاري الإرسال..."):
-                        res = send_code(email, st.session_state.otp)
-                        if res == "success":
-                            st.session_state.email_sent = True
-                            st.rerun()
-                        else: st.error(f"❌ فشل الإرسال: {res}")
-                else: st.warning("⚠️ تأكد من البيانات وإيميل الجامعة الرسمي")
-
-        if st.session_state.email_sent:
-            user_code = st.text_input("ادخل الكود المكون من 4 أرقام")
-            if st.button("تأكيد الحجز النهائي 🚀", use_container_width=True):
-                if user_code == st.session_state.otp:
+        # الزرار الأساسي للحجز
+        if st.button("تأكيد الحجز 🚀", use_container_width=True):
+            if name and student_id and email.lower().endswith("@zewailcity.edu.eg"):
+                # 1. فحص هل الإيميل سجل قبل كدة؟
+                if is_email_verified(email):
+                    # سجل قبل كدة -> حجز مباشر
                     data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
-                    with st.spinner("جاري التسجيل..."):
+                    with st.spinner("أهلاً بك مجدداً.. جاري الحجز المباشر..."):
                         try:
                             r = requests.post(URL_SCRIPT, json=data, timeout=25)
                             if r.json().get("result") == "success":
-                                st.balloons(); st.success("🎉 تم الحجز بنجاح!"); st.session_state.email_sent = False
-                            else: st.warning("⚠️ أنت مسجل بالفعل لهذا اليوم")
-                        except: st.error("❌ مشكلة في الاتصال بالسيرفر")
+                                st.balloons(); st.success("🎉 تم الحجز بنجاح بدون كود تأكيد!")
+                            else: st.warning("⚠️ مسجل بالفعل لهذا اليوم")
+                        except: st.error("❌ مشكلة في الاتصال")
+                else:
+                    # أول مرة يسجل -> نطلب OTP
+                    st.session_state.otp = str(random.randint(1000, 9999))
+                    with st.spinner("أول مرة تسجل؟ جاري إرسال كود التأكيد لإيميلك..."):
+                        res = send_code(email, st.session_state.otp)
+                        if res == "success":
+                            st.session_state.email_sent = True
+                            st.info("✅ تم إرسال الكود. ادخله بالأسفل لإتمام الحجز وتفعيل حسابك.")
+                        else: st.error(f"❌ فشل الإرسال: {res}")
+            else:
+                st.warning("⚠️ تأكد من البيانات وإيميل الجامعة الرسمي")
+
+        # خانة الـ OTP تظهر فقط لو المستخدم جديد
+        if st.session_state.email_sent:
+            user_code = st.text_input("ادخل كود التأكيد (لمرة واحدة فقط)")
+            if st.button("تفعيل الحجز والاشتراك"):
+                if user_code == st.session_state.otp:
+                    data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
+                    with st.spinner("جاري التفعيل والحجز..."):
+                        try:
+                            r = requests.post(URL_SCRIPT, json=data, timeout=25)
+                            if r.json().get("result") == "success":
+                                st.balloons(); st.success("🎉 تم التفعيل والحجز! المرة القادمة ستحجز مباشرة."); st.session_state.email_sent = False
+                            else: st.warning("⚠️ مسجل بالفعل لهذا اليوم")
+                        except: st.error("❌ مشكلة في الاتصال")
                 else: st.error("❌ الكود غير صحيح")
 
-# --- لوحة الإدارة (التعديل الجوهري هنا) ---
+# --- لوحة الإدارة (نفس كود الكاش الذكي السابق) ---
 with tab2:
     pw = st.text_input("كلمة السر", type="password")
     if pw == "Zewail2026":
-        # حفظ البيانات في الـ Session State عشان متختفيش مع الفلترة
-        if 'raw_data' not in st.session_state:
-            st.session_state.raw_data = None
-
-        if st.button("🔄 تحديث البيانات من الشيت", use_container_width=True):
+        if 'raw_data' not in st.session_state: st.session_state.raw_data = None
+        
+        if st.button("🔄 تحديث البيانات", use_container_width=True):
             try:
                 df = pd.read_csv(URL_SHEET_CSV)
-                all_cols = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room', 'Status']
-                df.columns = all_cols[:len(df.columns)]
+                df.columns = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room', 'Status'][:len(df.columns)]
                 df['Location'] = df['Location'].astype(str).str.strip()
                 df['Gender'] = df['Gender'].astype(str).str.strip()
-                st.session_state.raw_data = df # حفظ النسخة الأصلية
-                st.success("✅ تم تحديث البيانات بنجاح")
-            except Exception as e:
-                st.error(f"❌ خطأ: {str(e)}")
+                st.session_state.raw_data = df
+                st.success("✅ تم التحديث")
+            except Exception as e: st.error(f"❌ خطأ: {str(e)}")
 
         if st.session_state.raw_data is not None:
             df = st.session_state.raw_data
+            st.markdown(f'<div class="total-banner">إجمالي الحجوزات: {len(df)}</div>', unsafe_allow_html=True)
             
-            st.markdown(f'<div class="total-banner">إجمالي الحجوزات: {len(df)} وجبة</div>', unsafe_allow_html=True)
-
-            def show_stats(loc_val, title):
-                area = df[df['Location'] == loc_val]
-                b, g = len(area[area['Gender'] == 'ولد']), len(area[area['Gender'] == 'بنت'])
-                st.markdown(f'<div class="area-header">{title}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {b}</span> | <span class="girl-stat">بنات: {g}</span><br><b>المجموع: {len(area)}</b></div>', unsafe_allow_html=True)
-
+            # (إحصائيات المناطق والفلترة كما في النسخة السابقة)
             c1, c2, c3 = st.columns(3)
-            with c1: show_stats("عماير القرية الكونية", "الكونية")
-            with c2: show_stats("الفيروز / المنطقة التالتة", "الفيروز")
-            with c3: show_stats("سكن الجامعة (Dorms)", "Dorms")
-
-            st.markdown("---")
-            st.write("### 📋 تصفية الكشوفات التفصيلية")
+            def show_stats(v, t):
+                a = df[df['Location'] == v]
+                st.markdown(f'<div class="area-header">{t}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="stat-card">بنين: {len(a[a["Gender"]=="ولد"])} | بنات: {len(a[a["Gender"]=="بنت"])}<br><b>{len(a)}</b></div>', unsafe_allow_html=True)
             
-            f_area, f_gender = st.columns(2)
-            area_map = {"الكل": "الكل", "الكونية": "عماير القرية الكونية", "الفيروز": "الفيروز / المنطقة التالتة", "Dorms": "سكن الجامعة (Dorms)"}
-            sel_area = f_area.selectbox("المنطقة", list(area_map.keys()))
-            sel_gender = f_gender.selectbox("الجنس", ["الكل", "ولد", "بنت"])
-
-            # الفلترة بتتم على النسخة المحفوظة
-            display_df = df.copy()
-            if sel_area != "الكل":
-                display_df = display_df[display_df['Location'] == area_map[sel_area]]
-            if sel_gender != "الكل":
-                display_df = display_df[display_df['Gender'] == sel_gender]
-
-            if not display_df.empty:
-                st.write(f"✅ تم العثور على {len(display_df)} سجل")
-                st.dataframe(display_df, use_container_width=True)
-            else:
-                st.warning("⚠️ لا توجد نتائج مطابقة")
-
+            show_stats("عماير القرية الكونية", "الكونية")
+            show_stats("الفيروز / المنطقة التالتة", "الفيروز")
+            show_stats("سكن الجامعة (Dorms)", "Dorms")
+            
             st.markdown("---")
-            rec_id = st.text_input("ادخل ID الطالب لتأكيد الاستلام")
-            if st.button("تأكيد الاستلام ✅", use_container_width=True):
-                if rec_id:
-                    try:
-                        res = requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": rec_id})
-                        if res.json().get("result") == "success": 
-                            st.success("✅ تم التظليل بنجاح")
-                            st.session_state.raw_data = None # مسح الكاش لإجبار الموقع على التحديث
-                        else: st.error("❌ الرقم غير موجود")
-                    except: st.error("❌ فشل الاتصال")
+            f_area, f_gender = st.columns(2)
+            a_map = {"الكل": "الكل", "الكونية": "عماير القرية الكونية", "الفيروز": "الفيروز / المنطقة التالتة", "Dorms": "سكن الجامعة (Dorms)"}
+            s_a = f_area.selectbox("المنطقة", list(a_map.keys()))
+            s_g = f_gender.selectbox("الجنس", ["الكل", "ولد", "بنت"])
+            
+            d_df = df.copy()
+            if s_a != "الكل": d_df = d_df[d_df['Location'] == a_map[s_a]]
+            if s_g != "الكل": d_df = d_df[d_df['Gender'] == s_g]
+            st.dataframe(d_df, use_container_width=True)
