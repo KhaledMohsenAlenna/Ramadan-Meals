@@ -24,7 +24,7 @@ st.markdown("""
 st.markdown('<div class="main-title">وجبات رمضان</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">كل عام وأنتم بخير</div>', unsafe_allow_html=True)
 
-# function to send otp email
+# send email
 def send_code(receiver_email, code):
     sender = st.secrets["my_email"]
     password = st.secrets["my_password"]
@@ -58,7 +58,7 @@ with tab1:
     if is_open == False:
         st.error("انتهى وقت الحجز لليوم")
     else:
-        # session state variables
+        # variables
         if 'otp' not in st.session_state:
             st.session_state.otp = ""
         if 'email_sent' not in st.session_state:
@@ -77,7 +77,7 @@ with tab1:
         with col2:
             room = st.text_input("رقم الغرفة (للسكن فقط)")
         
-        # check if email is sent
+        # send code
         if st.session_state.email_sent == False:
             if st.button("إرسال كود التأكيد"):
                 if name == "" or student_id == "" or email == "":
@@ -96,15 +96,14 @@ with tab1:
                         else:
                             st.error("فشل الارسال، راجع اعدادات الايميل")
         
-        # if email is sent, show the confirmation box and the support message
+        # confirm code
         if st.session_state.email_sent == True:
             st.success("✅ الكود اتبعت للايميل بتاعك")
             
-            # الرسالة التنبيهية وأرقام التواصل
             st.info("""
-            💡 **تنبيه هام:** غالباً هتلاقي كود التأكيد وصل في مجلد الـ **Spam** (الرسائل غير المرغوب فيها)، يرجى التحقق منه.
+            💡 **تنبيه هام:** غالباً هتلاقي كود التأكيد وصل في مجلد الـ **Spam** (الرسائل غير المرغوب فيها).
             
-            📞 **لو واجهتك أي مشكلة في التسجيل، تواصل معانا على الأرقام دي:**
+            📞 **للتواصل والمساعدة:**
             * 01025687330
             * 01094541437 (+20)
             * 01017194365 (+20)
@@ -157,12 +156,21 @@ with tab2:
         if st.button("تأكيد الحذف"):
             if del_id != "":
                 del_data = {"action": "delete", "student_id": del_id}
-                res = requests.post(URL_SCRIPT, json=del_data)
-                res_json = res.json()
-                
-                if res_json.get("result") == "success":
-                    st.success("تم مسح الطالب بنجاح")
-                else:
-                    st.error("ال ID مش موجود في الحجوزات")
+                with st.spinner("جاري التواصل مع الشيت..."):
+                    try:
+                        res = requests.post(URL_SCRIPT, json=del_data)
+                        
+                        # catch json decode error
+                        try:
+                            res_json = res.json()
+                            if res_json.get("result") == "success":
+                                st.success("تم مسح الطالب بنجاح")
+                            else:
+                                st.error("ال ID مش موجود في الحجوزات")
+                        except ValueError:
+                            st.error("⚠️ جوجل سكريبت رد بـ HTML. اتأكد إنك عملت New Deployment للكود في جوجل.")
+                            
+                    except Exception as e:
+                        st.error("فشل الاتصال بجوجل شيت")
             else:
                 st.warning("اكتب الرقم الاول")
