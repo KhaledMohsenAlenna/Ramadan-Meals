@@ -7,14 +7,14 @@ import smtplib
 from email.mime.text import MIMEText
 import random
 
-# --- إعدادات الصفحة الاحترافية ---
+# إعدادات الصفحة
 st.set_page_config(page_title="منظومة وجبات رمضان", layout="wide")
 
-# الروابط (تأكد أن رابط السكريبت هو الأحدث دائماً)
+# الروابط الخاصة بك
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyu51AdH5kuXUMHV2gVEHLguQNNNc0u8lnEFlDoB4czzAz7Le6rPBbSxUuCFjnrHen3/exec"
 URL_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqNEDayFNEgFoQqq-wF29BRkxF9u5YIrPYac54o3_hy3O5MvuQiQiwKKQ9oSlkx08JnXeN-mPu95Qk/pub?output=csv"
 
-# --- التنسيق الجمالي (CSS) ---
+# تنسيق CSS احترافي
 st.markdown("""
     <style>
     .stApp { background-color: #0a192f; color: white; }
@@ -37,7 +37,7 @@ def send_code(receiver_email, code):
         sender = st.secrets["my_email"]
         password = st.secrets["my_password"]
         msg = MIMEText(f"كود التأكيد الخاص بك هو: {code}")
-        msg['Subject'] = 'تأكيد حجز الإفطار - مدينة زويل'
+        msg['Subject'] = 'تأكيد حجز الإفطار'
         msg['From'] = sender
         msg['To'] = receiver_email
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
@@ -61,14 +61,15 @@ with tab1:
         if 'otp' not in st.session_state: st.session_state.otp = ""
         if 'email_sent' not in st.session_state: st.session_state.email_sent = False
 
-        col_1, col_2 = st.columns(2)
-        name = col_1.text_input("الاسم الثلاثي")
-        student_id = col_2.text_input("University ID")
+        col1, col2 = st.columns(2)
+        name = col1.text_input("الاسم الثلاثي")
+        student_id = col2.text_input("University ID")
         email = st.text_input("الإيميل الجامعي الرسمي")
         
-        col_3, col_4 = st.columns(2)
-        location = col_3.selectbox("مكان الاستلام", ["عماير القرية الكونية", "الفيروز / المنطقة التالتة", "سكن الجامعة (Dorms)"])
-        gender = col_4.radio("الجنس", ["ولد", "بنت"], horizontal=True)
+        col3, col4 = st.columns(2)
+        # الأسماء هنا لازم تطابق اللي في الشيت بالظبط
+        location = col3.selectbox("مكان الاستلام", ["عماير القرية الكونية", "الفيروز / المنطقة التالتة", "سكن الجامعة (Dorms)"])
+        gender = col4.radio("الجنس", ["ولد", "بنت"], horizontal=True)
         room = st.text_input("رقم الغرفة (للسكن فقط)")
 
         if not st.session_state.email_sent:
@@ -81,7 +82,7 @@ with tab1:
                             st.session_state.email_sent = True
                             st.rerun()
                         else: st.error(f"❌ فشل الإرسال: {res}")
-                else: st.warning("⚠️ تأكد من البيانات وإيميل الجامعة")
+                else: st.warning("⚠️ تأكد من البيانات وإيميل الجامعة الرسمي")
 
         if st.session_state.email_sent:
             user_code = st.text_input("ادخل الكود المكون من 4 أرقام")
@@ -92,30 +93,35 @@ with tab1:
                         try:
                             r = requests.post(URL_SCRIPT, json=data, timeout=25)
                             if r.json().get("result") == "success":
-                                st.balloons(); st.success("🎉 تم الحجز بنجاح!"); st.session_state.email_sent = False
-                            else: st.warning("⚠️ مسجل بالفعل لهذا اليوم")
-                        except: st.error("❌ مشكلة في الاتصال")
+                                st.balloons()
+                                st.success("🎉 تم الحجز بنجاح!")
+                                st.session_state.email_sent = False
+                            else: st.warning("⚠️ أنت مسجل بالفعل لهذا اليوم")
+                        except: st.error("❌ مشكلة في الاتصال بالسيرفر")
                 else: st.error("❌ الكود غير صحيح")
 
 # --- التبويب الثاني: لوحة الإدارة (Dashboard) ---
 with tab2:
     pw = st.text_input("كلمة السر", type="password")
     if pw == "Zewail2026":
-        if st.button("🔄 تحديث الإحصائيات", use_container_width=True):
+        if st.button("🔄 تحديث الإحصائيات والكشوفات", use_container_width=True):
             try:
                 df = pd.read_csv(URL_SHEET_CSV)
-                # تسمية الأعمدة لضمان التوافق مع الشيت
-                df.columns = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room', 'Status'][:len(df.columns)]
+                # تسمية الأعمدة لضمان التوافق (8 أعمدة حسب الشيت بتاعك)
+                all_cols = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room', 'Status']
+                df.columns = all_cols[:len(df.columns)]
                 
-                # تنظيف البيانات من المسافات
+                # تنظيف البيانات من المسافات الزائدة
                 df['Location'] = df['Location'].astype(str).str.strip()
                 df['Gender'] = df['Gender'].astype(str).str.strip()
 
                 st.markdown(f'<div class="total-banner">إجمالي الحجوزات: {len(df)} وجبة</div>', unsafe_allow_html=True)
 
+                # دالة عرض إحصائيات كل منطقة
                 def show_stats(loc_val, title):
                     area = df[df['Location'] == loc_val]
-                    b, g = len(area[area['Gender'] == 'ولد']), len(area[area['Gender'] == 'بنت'])
+                    b = len(area[area['Gender'] == 'ولد'])
+                    g = len(area[area['Gender'] == 'بنت'])
                     st.markdown(f'<div class="area-header">{title}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {b}</span> | <span class="girl-stat">بنات: {g}</span><br><b>المجموع: {len(area)}</b></div>', unsafe_allow_html=True)
 
@@ -128,22 +134,31 @@ with tab2:
                 st.write("### 📋 تصفية الكشوفات التفصيلية")
                 
                 f_area, f_gender = st.columns(2)
-                # ربط الاختيارات بالقيم الحقيقية في الشيت
-                area_options = {"الكل": "الكل", "الكونية": "عماير القرية الكونية", "الفيروز": "الفيروز / المنطقة التالتة", "Dorms": "سكن الجامعة (Dorms)"}
-                sel_area = f_area.selectbox("المنطقة", list(area_options.keys()))
+                # الربط الصحيح بين الاختيارات والبيانات في الشيت
+                area_map = {
+                    "الكل": "الكل",
+                    "الكونية": "عماير القرية الكونية",
+                    "الفيروز": "الفيروز / المنطقة التالتة",
+                    "Dorms": "سكن الجامعة (Dorms)"
+                }
+                
+                sel_area = f_area.selectbox("المنطقة", list(area_map.keys()))
                 sel_gender = f_gender.selectbox("الجنس", ["الكل", "ولد", "بنت"])
 
                 display_df = df.copy()
-                if sel_area != "الكل": display_df = display_df[display_df['Location'] == area_options[sel_area]]
-                if sel_gender != "الكل": display_df = display_df[display_df['Gender'] == sel_gender]
+                if sel_area != "الكل":
+                    display_df = display_df[display_df['Location'] == area_map[sel_area]]
+                if sel_gender != "الكل":
+                    display_df = display_df[display_df['Gender'] == sel_gender]
 
                 if not display_df.empty:
-                    st.write(f"✅ تم العثور على {len(display_df)} سجل")
+                    st.write(f"✅ تم العثور على {len(display_df)} سجل:")
                     st.dataframe(display_df, use_container_width=True)
                 else:
-                    st.warning("⚠️ لا توجد نتائج مطابقة")
+                    st.warning("⚠️ لا توجد نتائج مطابقة لهذا الاختيار.")
 
-            except Exception as e: st.error(f"❌ خطأ: {str(e)}")
+            except Exception as e:
+                st.error(f"❌ خطأ في جلب البيانات: {str(e)}")
 
         st.markdown("---")
         rec_id = st.text_input("ادخل ID الطالب لتأكيد الاستلام")
@@ -151,6 +166,7 @@ with tab2:
             if rec_id:
                 try:
                     res = requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": rec_id})
-                    if res.json().get("result") == "success": st.success("✅ تم التظليل بنجاح")
-                    else: st.error("❌ الرقم غير موجود")
-                except: st.error("❌ فشل الاتصال")
+                    if res.json().get("result") == "success":
+                        st.success(f"✅ تم تأكيد استلام الطالب {rec_id} بنجاح.")
+                    else: st.error("❌ الرقم الجامعي غير موجود.")
+                except: st.error("❌ فشل الاتصال بالسيرفر.")
