@@ -7,17 +7,18 @@ import smtplib
 from email.mime.text import MIMEText
 import random
 
+# 1. إعدادات الصفحة
 st.set_page_config(page_title="وجبات رمضان - مدينة زويل", layout="wide")
 
-# الرابط الجديد اللي لسه عامله
+# الروابط الخاصة بك
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyu51AdH5kuXUMHV2gVEHLguQNNNc0u8lnEFlDoB4czzAz7Le6rPBbSxUuCFjnrHen3/exec"
 URL_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqNEDayFNEgFoQqq-wF29BRkxF9u5YIrPYac54o3_hy3O5MvuQiQiwKKQ9oSlkx08JnXeN-mPu95Qk/pub?output=csv"
 
-# css style
+# 2. تنسيق الموقع (CSS)
 st.markdown("""
     <style>
     .stApp { background-color: #0a192f; }
-    .main-title { color: #f1c40f; text-align: center; font-size: 3rem; margin-top: -50px;}
+    .main-title { color: #f1c40f; text-align: center; font-size: 3rem; margin-top: -50px; font-weight: bold;}
     .sub-title { color: #ffffff; text-align: center; font-size: 1.5rem; margin-bottom: 30px;}
     </style>
     """, unsafe_allow_html=True)
@@ -25,39 +26,40 @@ st.markdown("""
 st.markdown('<div class="main-title">وجبات رمضان</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">كل عام وأنتم بخير</div>', unsafe_allow_html=True)
 
-# func to send email and return error if fails
+# 3. دالة إرسال الإيميل مع فحص الأخطاء
 def send_code(receiver_email, code):
     try:
+        # قراءة البيانات من الـ Secrets السري
         sender = st.secrets["my_email"]
         password = st.secrets["my_password"]
         
-        msg = MIMEText("كود التأكيد الخاص بك هو: " + str(code))
+        msg = MIMEText(f"كود التأكيد الخاص بك هو: {code}")
         msg['Subject'] = 'تأكيد حجز الإفطار - مدينة زويل'
         msg['From'] = sender
         msg['To'] = receiver_email
         
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(sender, password)
-        server.sendmail(sender, receiver_email, msg.as_string())
-        server.quit()
+        # الاتصال بسيرفر جوجل
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(sender, password)
+            server.sendmail(sender, receiver_email, msg.as_string())
         return "success"
     except Exception as e:
+        # إرجاع نص الخطأ الحقيقي للتشخيص
         return str(e)
 
-tab1, tab2 = st.tabs(["تسجيل حجز جديد", "لوحة تحكم المسؤولين"])
+# 4. التبويبات (Tabs)
+tab1, tab2 = st.tabs(["📝 تسجيل حجز جديد", "🔐 لوحة الإدارة الذكية"])
 
+# --- التبويب الأول: التسجيل ---
 with tab1:
     cairo_tz = pytz.timezone('Africa/Cairo')
     now = datetime.now(cairo_tz)
     
-    is_open = False
-    if now.hour >= 0 and now.hour < 16:
-        is_open = True
-    elif now.hour == 16 and now.minute < 30:
-        is_open = True
+    # فتح الحجز من 12 صباحاً لـ 4:30 عصراً
+    is_open = (0 <= now.hour < 16) or (now.hour == 16 and now.minute < 30)
 
-    if is_open == False:
-        st.error("انتهى وقت الحجز لليوم")
+    if not is_open:
+        st.error(f"⛔ انتهى وقت الحجز لليوم. الساعة الآن {now.strftime('%I:%M %p')}")
     else:
         if 'otp' not in st.session_state:
             st.session_state.otp = ""
@@ -66,104 +68,78 @@ with tab1:
 
         name = st.text_input("الاسم الثلاثي")
         student_id = st.text_input("University ID")
-        email = st.text_input("Zewail Email (@zewailcity.edu.eg)")
+        email = st.text_input("الإيميل الجامعي الرسمي")
         
-        locations = ["عماير القرية الكونية", "الفيروز / المنطقة التالتة", "سكن الجامعة (Dorms)"]
-        location = st.selectbox("مكان الاستلام", locations)
+        location = st.selectbox("مكان الاستلام", ["عماير القرية الكونية", "الفيروز / المنطقة التالتة", "سكن الجامعة (Dorms)"])
         
         col1, col2 = st.columns(2)
-        with col1:
-            gender = st.radio("النوع", ["ولد", "بنت"], horizontal=True)
-        with col2:
-            room = st.text_input("رقم الغرفة (للسكن فقط)")
+        gender = col1.radio("النوع", ["ولد", "بنت"], horizontal=True)
+        room = col2.text_input("رقم الغرفة (للسكن فقط)")
         
-        if st.session_state.email_sent == False:
+        # المرحلة الأولى: إرسال الكود
+        if not st.session_state.email_sent:
             if st.button("إرسال كود التأكيد"):
-                if name == "" or student_id == "" or email == "":
-                    st.warning("اكتب كل البيانات الاول")
-                elif email.lower().endswith("@zewailcity.edu.eg") == False:
-                    st.error("لازم تستخدم ايميل الجامعة")
+                if not name or not student_id or not email:
+                    st.warning("⚠️ يرجى ملء كافة البيانات أولاً")
+                elif not email.lower().endswith("@zewailcity.edu.eg"):
+                    st.error("❌ يجب استخدام إيميل الجامعة الرسمي")
                 else:
-                    generated_otp = random.randint(1000, 9999)
-                    st.session_state.otp = str(generated_otp)
-                    
-                    with st.spinner("جاري ارسال الكود..."):
-                        send_result = send_code(email, st.session_state.otp)
-                        if send_result == "success":
+                    st.session_state.otp = str(random.randint(1000, 9999))
+                    with st.spinner("جاري إرسال الكود..."):
+                        result = send_code(email, st.session_state.otp)
+                        if result == "success":
                             st.session_state.email_sent = True
                             st.rerun()
                         else:
-                            st.error("فشل الارسال، السبب: " + send_result)
-        
-        if st.session_state.email_sent == True:
-            st.success("✅ الكود اتبعت للايميل بتاعك")
+                            # عرض الخطأ الحقيقي
+                            st.error(f"❌ فشل الإرسال. السبب: {result}")
+
+        # المرحلة الثانية: التأكيد والحجز
+        if st.session_state.email_sent:
+            st.success("✅ تم إرسال الكود لإيميلك (افحص الـ Spam)")
+            st.info("📞 للدعم: 01025687330 | 01094541437 | 01017194365")
             
-            st.info("💡 تنبيه هام: غالباً هتلاقي كود التأكيد وصل في مجلد الـ Spam (الرسائل غير المرغوب فيها).\n\n📞 للتواصل والمساعدة:\n* 01025687330\n* 01094541437 (+20)\n* 01017194365 (+20)")
-            
-            user_otp = st.text_input("اكتب الكود هنا")
-            
+            user_code = st.text_input("اكتب الكود المكون من 4 أرقام")
             if st.button("تأكيد وحجز الوجبة"):
-                if user_otp == st.session_state.otp:
-                    data = {
-                        "name": name, 
-                        "id": student_id, 
-                        "email": email, 
-                        "location": location, 
-                        "gender": gender, 
-                        "room": room
-                    }
-                    
+                if user_code == st.session_state.otp:
+                    data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
                     with st.spinner("جاري الحجز..."):
                         res = requests.post(URL_SCRIPT, json=data)
-                        
                         try:
-                            res_json = res.json()
-                            if res_json.get("result") == "success":
+                            if res.json().get("result") == "success":
                                 st.balloons()
-                                st.success("تم تسجيل وجبتك بنجاح")
+                                st.success("🎉 تم تسجيل حجزك بنجاح!")
                                 st.session_state.email_sent = False
-                            elif res_json.get("message") == "duplicate":
-                                st.warning("الرقم الجامعي أو الإيميل سجل قبل كدا النهاردة")
-                        except ValueError:
-                            st.error("⚠️ مشكلة في الرد من جوجل. اتأكد من تحديث السكريبت.")
+                            else:
+                                st.warning("⚠️ أنت مسجل بالفعل لهذا اليوم")
+                        except:
+                            st.error("⚠️ مشكلة في الرد من جوجل سكريبت")
                 else:
-                    st.error("الكود غلط، راجع الايميل تاني")
+                    st.error("❌ الكود غير صحيح")
 
+# --- التبويب الثاني: الإدمن ---
 with tab2:
-    st.write("لوحة تحكم المسؤولين")
-    pw = st.text_input("كلمة السر", type="password")
-    
-    if pw == "Zewail2026":
-        st.success("اهلا بك")
-        
-        if st.button("عرض الجدول"):
+    st.write("### 🛠️ لوحة تحكم المسؤولين")
+    admin_pw = st.text_input("كلمة السر", type="password")
+    if admin_pw == "Zewail2026":
+        st.success("أهلاً يا خالد")
+        if st.button("🔄 عرض كشف الأسماء الحالية"):
             try:
                 df = pd.read_csv(URL_SHEET_CSV)
-                st.write("عدد المسجلين: " + str(len(df)))
+                st.write(f"إجمالي الحجوزات: {len(df)}")
                 st.dataframe(df, use_container_width=True)
-            except Exception as e:
-                st.error("مشكلة في تحميل الشيت")
+            except:
+                st.error("❌ فشل تحميل البيانات")
 
-        st.write("حذف بيانات طالب")
-        del_id = st.text_input("ادخل ال ID للحذف")
-        
-        if st.button("تأكيد الحذف"):
-            if del_id != "":
-                del_data = {"action": "delete", "student_id": del_id}
-                with st.spinner("جاري التواصل مع الشيت..."):
-                    try:
-                        res = requests.post(URL_SCRIPT, json=del_data)
-                        
-                        try:
-                            res_json = res.json()
-                            if res_json.get("result") == "success":
-                                st.success("تم مسح الطالب بنجاح")
-                            else:
-                                st.error("ال ID مش موجود في الحجوزات")
-                        except ValueError:
-                            st.error("⚠️ جوجل سكريبت رد بـ HTML. اتأكد إنك عملت New Deployment للكود في جوجل.")
-                            
-                    except Exception as e:
-                        st.error("فشل الاتصال بجوجل شيت")
-            else:
-                st.warning("اكتب الرقم الاول")
+        st.markdown("---")
+        del_id = st.text_input("ادخل ID الطالب للحذف")
+        if st.button("🗑️ حذف الحجز"):
+            if del_id:
+                res = requests.post(URL_SCRIPT, json={"action": "delete", "student_id": del_id})
+                try:
+                    if res.json().get("result") == "success":
+                        st.success(f"✅ تم حذف الطالب {del_id}")
+                    else:
+                        st.error("❌ الـ ID غير موجود")
+                except:
+                    st.error("⚠️ جوجل سكريبت رد بـ HTML. تأكد من عمل New Deployment.")
