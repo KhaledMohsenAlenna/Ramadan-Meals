@@ -14,15 +14,16 @@ st.set_page_config(page_title="وجبات رمضان", layout="wide")
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyu51AdH5kuXUMHV2gVEHLguQNNNc0u8lnEFlDoB4czzAz7Le6rPBbSxUuCFjnrHen3/exec"
 URL_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqNEDayFNEgFoQqq-wF29BRkxF9u5YIrPYac54o3_hy3O5MvuQiQiwKKQ9oSlkx08JnXeN-mPu95Qk/pub?output=csv"
 
-# تنسيق CSS محسن للـ Dashboard
+# تنسيق CSS احترافي للـ Dashboard
 st.markdown("""
     <style>
     .stApp { background-color: #0a192f; color: white; }
-    .main-title { color: #f1c40f; text-align: center; font-size: 3rem; font-weight: bold; margin-top: -50px; }
-    .sub-title { color: #ffffff; text-align: center; font-size: 1.8rem; margin-bottom: 30px; }
-    .stat-card { background-color: #1a2a4a; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #f1c40f; margin-bottom: 10px; }
-    .gender-card { border: 1px solid #3498db; background-color: #0d2137; }
-    h2, h3, h6 { margin: 0; padding: 0; }
+    .main-title { color: #f1c40f; text-align: center; font-size: 2.8rem; font-weight: bold; margin-top: -50px; }
+    .sub-title { color: #ffffff; text-align: center; font-size: 1.5rem; margin-bottom: 30px; }
+    .stat-card { background-color: #1a2a4a; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #f1c40f; margin-bottom: 5px; }
+    .area-header { background-color: #f1c40f; color: #0a192f; padding: 5px 15px; border-radius: 5px; font-weight: bold; margin: 15px 0 10px 0; text-align: center; }
+    .boy-stat { color: #3498db; font-size: 1.2rem; font-weight: bold; }
+    .girl-stat { color: #e91e63; font-size: 1.2rem; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -98,41 +99,61 @@ with tab1:
 with tab2:
     pw = st.text_input("كلمة السر للمسؤول", type="password")
     if pw == "Zewail2026":
-        st.write("### 📊 إحصائيات الوجبات والتوزيع")
-        
-        if st.button("🔄 تحديث الإحصائيات والجدول"):
+        if st.button("🔄 تحديث الإحصائيات والكشوفات"):
             try:
+                # قراءة الشيت وتحديد أسماء الأعمدة يدوياً للتأكد من العد الصحيح
                 df = pd.read_csv(URL_SHEET_CSV)
-                
-                # 1. إحصائيات المناطق (العمود رقم 5 - Index 4)
-                loc_stats = df.iloc[:, 4].value_counts()
-                
-                # 2. إحصائيات النوع (العمود رقم 6 - Index 5)
-                gender_stats = df.iloc[:, 5].value_counts()
-                
-                # الصف الأول: إحصائيات عامة والنوع
-                st.write("#### الإحصائيات العامة والنوع")
-                c_total, c_boys, c_girls = st.columns(3)
-                with c_total:
-                    st.markdown(f'<div class="stat-card"><h3>الإجمالي</h3><h2>{len(df)}</h2></div>', unsafe_allow_html=True)
-                with c_boys:
-                    st.markdown(f'<div class="stat-card gender-card"><h3>بنين 👦</h3><h2>{gender_stats.get("ولد", 0)}</h2></div>', unsafe_allow_html=True)
-                with c_girls:
-                    st.markdown(f'<div class="stat-card gender-card"><h3>بنات 👧</h3><h2>{gender_stats.get("بنت", 0)}</h2></div>', unsafe_allow_html=True)
+                df.columns = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room']
 
-                # الصف الثاني: توزيع المناطق (بالمسميات الجديدة)
-                st.write("#### توزيع الوجبات حسب المنطقة")
-                c_konia, c_fayrouz, c_dorms = st.columns(3)
-                with c_konia:
-                    st.markdown(f'<div class="stat-card"><h6>الكونية</h6><h2>{loc_stats.get("عماير القرية الكونية", 0)}</h2></div>', unsafe_allow_html=True)
-                with c_fayrouz:
-                    st.markdown(f'<div class="stat-card"><h6>الفيروز</h6><h2>{loc_stats.get("الفيروز / المنطقة التالتة", 0)}</h2></div>', unsafe_allow_html=True)
-                with c_dorms:
-                    st.markdown(f'<div class="stat-card"><h6>Dorms</h6><h2>{loc_stats.get("سكن الجامعة (Dorms)", 0)}</h2></div>', unsafe_allow_html=True)
+                # --- الإحصائيات التفصيلية ---
+                st.write("### 📊 إحصائيات الوجبات (ولاد وبنات)")
+                
+                def get_stats(loc_name):
+                    area_df = df[df['Location'] == loc_name]
+                    boys = len(area_df[area_df['Gender'] == 'ولد'])
+                    girls = len(area_df[area_df['Gender'] == 'بنت'])
+                    return boys, girls, len(area_df)
+
+                # حساب الأرقام
+                k_b, k_g, k_t = get_stats("عماير القرية الكونية")
+                f_b, f_g, f_t = get_stats("الفيروز / المنطقة التالتة")
+                d_b, d_g, d_t = get_stats("سكن الجامعة (Dorms)")
+
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.markdown('<div class="area-header">الكونية</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {k_b}</span><br><span class="girl-stat">بنات: {k_g}</span><br><b>الإجمالي: {k_t}</b></div>', unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown('<div class="area-header">الفيروز</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {f_b}</span><br><span class="girl-stat">بنات: {f_g}</span><br><b>الإجمالي: {f_t}</b></div>', unsafe_allow_html=True)
+                
+                with col3:
+                    st.markdown('<div class="area-header">Dorms</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {d_b}</span><br><span class="girl-stat">بنات: {d_g}</span><br><b>الإجمالي: {d_t}</b></div>', unsafe_allow_html=True)
+
+                st.markdown(f'<div style="text-align:center; font-size:1.5rem; margin-top:10px;"><b>إجمالي الوجبات الكلي: {len(df)}</b></div>', unsafe_allow_html=True)
                 
                 st.markdown("---")
-                st.write("#### كشف الأسماء التفصيلي")
-                st.dataframe(df, use_container_width=True)
+                
+                # --- عرض الجداول حسب المنطقة والجنس ---
+                st.write("### 📋 كشوفات التوزيع التفصيلية")
+                
+                selected_area = st.selectbox("اختر المنطقة لعرض الأسماء", ["الكل", "الكونية", "الفيروز", "Dorms"])
+                selected_gender = st.selectbox("اختر الجنس", ["الكل", "ولد", "بنت"])
+                
+                # منطق الفلترة
+                display_df = df.copy()
+                area_map = {"الكونية": "عماير القرية الكونية", "الفيروز": "الفيروز / المنطقة التالتة", "Dorms": "سكن الجامعة (Dorms)"}
+                
+                if selected_area != "الكل":
+                    display_df = display_df[display_df['Location'] == area_map[selected_area]]
+                if selected_gender != "الكل":
+                    display_df = display_df[display_df['Gender'] == selected_gender]
+                
+                st.write(f"عدد المسجلين في هذا القسم: {len(display_df)}")
+                st.dataframe(display_df, use_container_width=True)
                 
             except Exception as e:
                 st.error(f"خطأ في جلب البيانات: {str(e)}")
