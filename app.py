@@ -7,10 +7,10 @@ import smtplib
 from email.mime.text import MIMEText
 import random
 
-# إعدادات الصفحة الاحترافية
+# إعدادات الصفحة
 st.set_page_config(page_title="منظومة وجبات رمضان", layout="wide")
 
-# الروابط الخاصة بك
+# الروابط
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyu51AdH5kuXUMHV2gVEHLguQNNNc0u8lnEFlDoB4czzAz7Le6rPBbSxUuCFjnrHen3/exec"
 URL_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqNEDayFNEgFoQqq-wF29BRkxF9u5YIrPYac54o3_hy3O5MvuQiQiwKKQ9oSlkx08JnXeN-mPu95Qk/pub?output=csv"
 
@@ -49,7 +49,6 @@ def send_code(receiver_email, code):
 
 tab1, tab2 = st.tabs(["📝 تسجيل حجز جديد", "📊 لوحة الإدارة الذكية"])
 
-# --- التبويب الأول: التسجيل ---
 with tab1:
     cairo_tz = pytz.timezone('Africa/Cairo')
     now = datetime.now(cairo_tz)
@@ -97,71 +96,71 @@ with tab1:
                         except: st.error("❌ مشكلة في الاتصال بالسيرفر")
                 else: st.error("❌ الكود غير صحيح")
 
-# --- التبويب الثاني: لوحة الإدارة (Dashboard) ---
+# --- لوحة الإدارة (التعديل الجوهري هنا) ---
 with tab2:
     pw = st.text_input("كلمة السر", type="password")
     if pw == "Zewail2026":
-        if st.button("🔄 تحديث الإحصائيات والكشوفات", use_container_width=True):
+        # حفظ البيانات في الـ Session State عشان متختفيش مع الفلترة
+        if 'raw_data' not in st.session_state:
+            st.session_state.raw_data = None
+
+        if st.button("🔄 تحديث البيانات من الشيت", use_container_width=True):
             try:
                 df = pd.read_csv(URL_SHEET_CSV)
                 all_cols = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room', 'Status']
                 df.columns = all_cols[:len(df.columns)]
-                
-                # تنظيف البيانات من المسافات الزائدة
                 df['Location'] = df['Location'].astype(str).str.strip()
                 df['Gender'] = df['Gender'].astype(str).str.strip()
-
-                st.markdown(f'<div class="total-banner">إجمالي الحجوزات: {len(df)} وجبة</div>', unsafe_allow_html=True)
-
-                def show_stats(loc_val, title):
-                    area = df[df['Location'] == loc_val]
-                    b = len(area[area['Gender'] == 'ولد'])
-                    g = len(area[area['Gender'] == 'بنت'])
-                    st.markdown(f'<div class="area-header">{title}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {b}</span> | <span class="girl-stat">بنات: {g}</span><br><b>المجموع: {len(area)}</b></div>', unsafe_allow_html=True)
-
-                c1, c2, c3 = st.columns(3)
-                with c1: show_stats("عماير القرية الكونية", "الكونية")
-                with c2: show_stats("الفيروز / المنطقة التالتة", "الفيروز")
-                with c3: show_stats("سكن الجامعة (Dorms)", "Dorms")
-
-                st.markdown("---")
-                st.write("### 📋 تصفية الكشوفات التفصيلية")
-                
-                f_area, f_gender = st.columns(2)
-                # الربط الصحيح بين الاختيارات والبيانات في الشيت
-                area_map = {
-                    "الكل": "الكل",
-                    "الكونية": "عماير القرية الكونية",
-                    "الفيروز": "الفيروز / المنطقة التالتة",
-                    "Dorms": "سكن الجامعة (Dorms)"
-                }
-                
-                sel_area = f_area.selectbox("المنطقة", list(area_map.keys()))
-                sel_gender = f_gender.selectbox("الجنس", ["الكل", "ولد", "بنت"])
-
-                display_df = df.copy()
-                if sel_area != "الكل":
-                    display_df = display_df[display_df['Location'] == area_map[sel_area]]
-                if sel_gender != "الكل":
-                    display_df = display_df[display_df['Gender'] == sel_gender]
-
-                if not display_df.empty:
-                    st.write(f"✅ تم العثور على {len(display_df)} سجل:")
-                    st.dataframe(display_df, use_container_width=True)
-                else:
-                    st.warning("⚠️ لا توجد نتائج مطابقة لهذا الاختيار.")
-
+                st.session_state.raw_data = df # حفظ النسخة الأصلية
+                st.success("✅ تم تحديث البيانات بنجاح")
             except Exception as e:
-                st.error(f"❌ خطأ في جلب البيانات: {str(e)}")
+                st.error(f"❌ خطأ: {str(e)}")
 
-        st.markdown("---")
-        rec_id = st.text_input("ادخل ID الطالب لتأكيد الاستلام")
-        if st.button("تأكيد الاستلام ✅", use_container_width=True):
-            if rec_id:
-                try:
-                    res = requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": rec_id})
-                    if res.json().get("result") == "success":
-                        st.success(f"✅ تم تأكيد استلام الطالب {rec_id} بنجاح.")
-                    else: st.error("❌ الرقم الجامعي غير موجود.")
-                except: st.error("❌ فشل الاتصال بالسيرفر.")
+        if st.session_state.raw_data is not None:
+            df = st.session_state.raw_data
+            
+            st.markdown(f'<div class="total-banner">إجمالي الحجوزات: {len(df)} وجبة</div>', unsafe_allow_html=True)
+
+            def show_stats(loc_val, title):
+                area = df[df['Location'] == loc_val]
+                b, g = len(area[area['Gender'] == 'ولد']), len(area[area['Gender'] == 'بنت'])
+                st.markdown(f'<div class="area-header">{title}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {b}</span> | <span class="girl-stat">بنات: {g}</span><br><b>المجموع: {len(area)}</b></div>', unsafe_allow_html=True)
+
+            c1, c2, c3 = st.columns(3)
+            with c1: show_stats("عماير القرية الكونية", "الكونية")
+            with c2: show_stats("الفيروز / المنطقة التالتة", "الفيروز")
+            with c3: show_stats("سكن الجامعة (Dorms)", "Dorms")
+
+            st.markdown("---")
+            st.write("### 📋 تصفية الكشوفات التفصيلية")
+            
+            f_area, f_gender = st.columns(2)
+            area_map = {"الكل": "الكل", "الكونية": "عماير القرية الكونية", "الفيروز": "الفيروز / المنطقة التالتة", "Dorms": "سكن الجامعة (Dorms)"}
+            sel_area = f_area.selectbox("المنطقة", list(area_map.keys()))
+            sel_gender = f_gender.selectbox("الجنس", ["الكل", "ولد", "بنت"])
+
+            # الفلترة بتتم على النسخة المحفوظة
+            display_df = df.copy()
+            if sel_area != "الكل":
+                display_df = display_df[display_df['Location'] == area_map[sel_area]]
+            if sel_gender != "الكل":
+                display_df = display_df[display_df['Gender'] == sel_gender]
+
+            if not display_df.empty:
+                st.write(f"✅ تم العثور على {len(display_df)} سجل")
+                st.dataframe(display_df, use_container_width=True)
+            else:
+                st.warning("⚠️ لا توجد نتائج مطابقة")
+
+            st.markdown("---")
+            rec_id = st.text_input("ادخل ID الطالب لتأكيد الاستلام")
+            if st.button("تأكيد الاستلام ✅", use_container_width=True):
+                if rec_id:
+                    try:
+                        res = requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": rec_id})
+                        if res.json().get("result") == "success": 
+                            st.success("✅ تم التظليل بنجاح")
+                            st.session_state.raw_data = None # مسح الكاش لإجبار الموقع على التحديث
+                        else: st.error("❌ الرقم غير موجود")
+                    except: st.error("❌ فشل الاتصال")
