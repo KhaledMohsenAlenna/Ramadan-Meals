@@ -1,63 +1,120 @@
-function doPost(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var data = JSON.parse(e.postData.contents);
-  var action = data.action;
+import streamlit as st
+import requests
+import pandas as pd
+from datetime import datetime
+import pytz
+import smtplib
+from email.mime.text import MIMEText
+import random
 
-  // 1. مسح كشف اليوم (يدوياً من الأزرار أو تلقائياً)
-  if (action === "clear_day") {
-    var lastRow = sheet.getLastRow();
-    if (lastRow > 1) {
-      sheet.deleteRows(2, lastRow - 1);
-    }
-    return ContentService.createTextOutput(JSON.stringify({"result": "success"})).setMimeType(ContentService.MimeType.JSON);
-  }
+# إعدادات الصفحة
+st.set_page_config(page_title="منظومة وجبات رمضان", layout="wide")
 
-  // 2. حذف طالب معين بالـ ID
-  if (action === "delete_student") {
-    var studentId = data.student_id;
-    var values = sheet.getDataRange().getValues();
-    for (var i = 1; i < values.length; i++) {
-      if (values[i][3].toString() === studentId.toString()) {
-        sheet.deleteRow(i + 1);
-        return ContentService.createTextOutput(JSON.stringify({"result": "success"})).setMimeType(ContentService.MimeType.JSON);
-      }
-    }
-    return ContentService.createTextOutput(JSON.stringify({"result": "not_found"})).setMimeType(ContentService.MimeType.JSON);
-  }
+# الروابط - (تأكد من تحديث URL_SCRIPT بعد الـ Deployment الجديد)
+URL_SCRIPT = "رابط_السكريبت_الجديد_هنا"
+URL_SHEET_CSV = "رابط_CSV_الخاص_بالشيت_هنا"
 
-  // 3. تأكيد الاستلام (تظليل الصف بالأخضر)
-  if (action === "mark_received") {
-    var studentId = data.student_id;
-    var values = sheet.getDataRange().getValues();
-    for (var i = 1; i < values.length; i++) {
-      if (values[i][3].toString() === studentId.toString()) {
-        sheet.getRange(i + 1, 1, 1, sheet.getLastColumn()).setBackground("#d9ead3"); // تظليل أخضر
-        sheet.getRange(i + 1, 8).setValue("تم الاستلام ✅"); // تحديث الحالة
-        return ContentService.createTextOutput(JSON.stringify({"result": "success"})).setMimeType(ContentService.MimeType.JSON);
-      }
-    }
-    return ContentService.createTextOutput(JSON.stringify({"result": "not_found"})).setMimeType(ContentService.MimeType.JSON);
-  }
+# تنسيق CSS
+st.markdown("""
+    <style>
+    .stApp { background-color: #0a192f; color: white; }
+    .main-title { color: #f1c40f; text-align: center; font-size: 2.8rem; font-weight: bold; margin-top: -50px; }
+    .stat-card-mini { background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 10px; border-left: 5px solid #f1c40f; text-align: center; margin-bottom: 10px; }
+    .area-tag { background: #f1c40f; color: #0a192f; padding: 2px 8px; border-radius: 5px; font-weight: bold; font-size: 0.8rem; }
+    .boy-text { color: #3498db; } .girl-text { color: #e91e63; }
+    .total-banner { background: #f1c40f; color: #0a192f; padding: 10px; border-radius: 10px; text-align: center; font-weight: bold; margin-bottom: 20px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-  // 4. تسجيل حجز جديد (مع منع التكرار)
-  var timestamp = new Date();
-  var id = data.id;
-  var email = data.email;
-  var values = sheet.getDataRange().getValues();
-  for (var i = 0; i < values.length; i++) {
-    if (values[i][3].toString() === id.toString() || values[i][2].toString() === email.toString()) {
-      return ContentService.createTextOutput(JSON.stringify({"result": "error", "message": "duplicate"})).setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-  sheet.appendRow([timestamp, data.name, email, id, data.location, data.gender, data.room]);
-  return ContentService.createTextOutput(JSON.stringify({"result": "success"})).setMimeType(ContentService.MimeType.JSON);
-}
+st.markdown('<div class="main-title">منظومة وجبات رمضان 🌙</div>', unsafe_allow_html=True)
 
-// دالة المسح التلقائي - قم بضبط Trigger لها من الإعدادات لتعمل الساعة 12 بليل
-function autoClearSheet() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    sheet.deleteRows(2, lastRow - 1);
-  }
-}
+def send_code(receiver_email, code):
+    try:
+        sender = st.secrets["my_email"]
+        password = st.secrets["my_password"]
+        msg = MIMEText(f"كود التأكيد الخاص بك هو: {code}")
+        msg['Subject'] = 'تأكيد حجز الإفطار'
+        msg['From'] = sender
+        msg['To'] = receiver_email
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(sender, password)
+            server.sendmail(sender, receiver_email, msg.as_string())
+        return "success"
+    except Exception as e: return str(e)
+
+def is_email_verified(email_to_check):
+    try:
+        df_all = pd.read_csv(URL_SHEET_CSV)
+        verified_emails = df_all.iloc[:, 2].astype(str).str.strip().unique()
+        return email_to_check.strip() in verified_emails
+    except: return False
+
+tab1, tab2 = st.tabs(["📝 تسجيل حجز جديد", "📊 لوحة الإدارة الذكية"])
+
+with tab1:
+    cairo_tz = pytz.timezone('Africa/Cairo')
+    now = datetime.now(cairo_tz)
+    current_minutes = now.hour * 60 + now.minute
+    close_minutes = 16 * 60 + 30 # الساعة 4:30 عصراً
+    is_open = 0 <= current_minutes < close_minutes
+
+    if not is_open:
+        st.error(f"⛔ الحجز مغلق حالياً. يفتح يومياً من 12 صباحاً حتى 4:30 عصراً.")
+    else:
+        if 'otp' not in st.session_state: st.session_state.otp = ""
+        if 'email_sent' not in st.session_state: st.session_state.email_sent = False
+
+        c1, c2 = st.columns(2)
+        name = c1.text_input("الاسم الثلاثي")
+        student_id = c2.text_input("University ID")
+        email = st.text_input("الإيميل الجامعي الرسمي")
+        location = st.selectbox("مكان الاستلام", ["عماير القرية الكونية", "الفيروز / المنطقة التالتة", "سكن الجامعة (Dorms)"])
+        gender = st.radio("الجنس", ["ولد", "بنت"], horizontal=True)
+        room = st.text_input("رقم الغرفة")
+
+        if st.button("تأكيد الحجز 🚀", use_container_width=True):
+            if name and student_id and email.lower().endswith("@zewailcity.edu.eg"):
+                if is_email_verified(email):
+                    data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
+                    requests.post(URL_SCRIPT, json=data); st.success("🎉 تم الحجز!")
+                else:
+                    st.session_state.otp = str(random.randint(1000, 9999))
+                    send_code(email, st.session_state.otp)
+                    st.session_state.email_sent = True; st.info("✅ تم إرسال كود التأكيد.")
+            else: st.warning("⚠️ يرجى إكمال البيانات")
+
+        if st.session_state.email_sent:
+            user_code = st.text_input("ادخل الكود")
+            if st.button("تفعيل الحجز"):
+                if user_code == st.session_state.otp:
+                    data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
+                    requests.post(URL_SCRIPT, json=data); st.success("🎉 تم الحجز بنجاح!"); st.session_state.email_sent = False
+                else: st.error("❌ الكود خطأ")
+
+with tab2:
+    if st.text_input("كلمة السر", type="password") == "Zewail2026":
+        if st.button("🔄 تحديث وإحصاء البيانات", use_container_width=True):
+            df = pd.read_csv(URL_SHEET_CSV)
+            df.columns = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room', 'Status'][:len(df.columns)]
+            st.session_state.raw_data = df
+        
+        if 'raw_data' in st.session_state:
+            df = st.session_state.raw_data
+            st.markdown(f'<div class="total-banner">إجمالي وجبات اليوم: {len(df)}</div>', unsafe_allow_html=True)
+            
+            def get_c(loc, gen): return len(df[(df['Location'] == loc) & (df['Gender'] == gen)])
+            
+            # عرض الإحصائيات الـ 6 المفصلة
+            r1, r2 = st.columns(3), st.columns(3)
+            locs = [("عماير القرية الكونية", "الكونية"), ("الفيروز / المنطقة التالتة", "الفيروز"), ("سكن الجامعة (Dorms)", "Dorms")]
+            for i, (full, short) in enumerate(locs):
+                r1[i].markdown(f'<div class="stat-card-mini"><span class="area-tag">{short}</span><br><span class="boy-text">بنين: {get_c(full, "ولد")}</span></div>', unsafe_allow_html=True)
+                r2[i].markdown(f'<div class="stat-card-mini"><span class="area-tag">{short}</span><br><span class="girl-text">بنات: {get_c(full, "بنت")}</span></div>', unsafe_allow_html=True)
+
+            # أدوات التحكم
+            st.markdown("---")
+            t_id = st.text_input("ادخل الـ ID للإجراء")
+            c_m, c_d, c_clr = st.columns(3)
+            if c_m.button("✅ تأكيد استلام"): requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": t_id})
+            if c_d.button("❌ حذف حجز"): requests.post(URL_SCRIPT, json={"action": "delete_student", "student_id": t_id})
+            if c_clr.button("🗑️ مسح الكل"): requests.post(URL_SCRIPT, json={"action": "clear_day"})
