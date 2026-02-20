@@ -101,9 +101,13 @@ with tab2:
     if pw == "Zewail2026":
         if st.button("🔄 تحديث الإحصائيات والكشوفات"):
             try:
-                # قراءة الشيت وتحديد أسماء الأعمدة يدوياً للتأكد من العد الصحيح
+                # قراءة الشيت
                 df = pd.read_csv(URL_SHEET_CSV)
-                df.columns = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room']
+                
+                # حل مشكلة الـ Length mismatch بتسمية الأعمدة المتاحة فقط
+                num_cols = len(df.columns)
+                col_names = ['Timestamp', 'Name', 'Email', 'ID', 'Location', 'Gender', 'Room', 'Status']
+                df.columns = col_names[:num_cols]
 
                 # --- الإحصائيات التفصيلية ---
                 st.write("### 📊 إحصائيات الوجبات (ولاد وبنات)")
@@ -114,36 +118,34 @@ with tab2:
                     girls = len(area_df[area_df['Gender'] == 'بنت'])
                     return boys, girls, len(area_df)
 
-                # حساب الأرقام
                 k_b, k_g, k_t = get_stats("عماير القرية الكونية")
                 f_b, f_g, f_t = get_stats("الفيروز / المنطقة التالتة")
                 d_b, d_g, d_t = get_stats("سكن الجامعة (Dorms)")
 
                 col1, col2, col3 = st.columns(3)
-                
                 with col1:
                     st.markdown('<div class="area-header">الكونية</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {k_b}</span><br><span class="girl-stat">بنات: {k_g}</span><br><b>الإجمالي: {k_t}</b></div>', unsafe_allow_html=True)
-                
+                    st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {k_b}</span> | <span class="girl-stat">بنات: {k_g}</span><br><b>الإجمالي: {k_t}</b></div>', unsafe_allow_html=True)
                 with col2:
                     st.markdown('<div class="area-header">الفيروز</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {f_b}</span><br><span class="girl-stat">بنات: {f_g}</span><br><b>الإجمالي: {f_t}</b></div>', unsafe_allow_html=True)
-                
+                    st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {f_b}</span> | <span class="girl-stat">بنات: {f_g}</span><br><b>الإجمالي: {f_t}</b></div>', unsafe_allow_html=True)
                 with col3:
                     st.markdown('<div class="area-header">Dorms</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {d_b}</span><br><span class="girl-stat">بنات: {d_g}</span><br><b>الإجمالي: {d_t}</b></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-card"><span class="boy-stat">بنين: {d_b}</span> | <span class="girl-stat">بنات: {d_g}</span><br><b>الإجمالي: {d_t}</b></div>', unsafe_allow_html=True)
 
                 st.markdown(f'<div style="text-align:center; font-size:1.5rem; margin-top:10px;"><b>إجمالي الوجبات الكلي: {len(df)}</b></div>', unsafe_allow_html=True)
                 
                 st.markdown("---")
                 
-                # --- عرض الجداول حسب المنطقة والجنس ---
+                # --- عرض الجداول المفلترة ---
                 st.write("### 📋 كشوفات التوزيع التفصيلية")
                 
-                selected_area = st.selectbox("اختر المنطقة لعرض الأسماء", ["الكل", "الكونية", "الفيروز", "Dorms"])
-                selected_gender = st.selectbox("اختر الجنس", ["الكل", "ولد", "بنت"])
+                c_area, c_gender = st.columns(2)
+                with c_area:
+                    selected_area = st.selectbox("اختر المنطقة", ["الكل", "الكونية", "الفيروز", "Dorms"])
+                with c_gender:
+                    selected_gender = st.selectbox("اختر الجنس", ["الكل", "ولد", "بنت"])
                 
-                # منطق الفلترة
                 display_df = df.copy()
                 area_map = {"الكونية": "عماير القرية الكونية", "الفيروز": "الفيروز / المنطقة التالتة", "Dorms": "سكن الجامعة (Dorms)"}
                 
