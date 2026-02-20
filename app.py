@@ -26,7 +26,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-title">منظومة وجبات رمضان 🌙</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title"> وجبات رمضان 🌙</div>', unsafe_allow_html=True)
 
 # --- الدوال المساعدة ---
 def send_otp(receiver_email, code):
@@ -116,3 +116,4 @@ with tab2:
             if c_clr.button("🗑️ مسح الكل"):
                 if st.checkbox("تأكيد مسح اليوم"): requests.post(URL_SCRIPT, json={"action": "clear_day"}); st.rerun()
             st.dataframe(df, use_container_width=True)
+
