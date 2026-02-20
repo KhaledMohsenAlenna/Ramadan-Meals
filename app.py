@@ -8,9 +8,9 @@ from email.mime.text import MIMEText
 import random
 
 # إعداد الصفحة
-st.set_page_config(page_title="وجبات رمضان - مدينة زويل", layout="wide")
+st.set_page_config(page_title="وجبات رمضان", layout="wide")
 
-# الرابط الجديد الخاص بك
+# الرابط الخاص بك (تأكد من تحديثه دائماً لو عملت New Deployment)
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyu51AdH5kuXUMHV2gVEHLguQNNNc0u8lnEFlDoB4czzAz7Le6rPBbSxUuCFjnrHen3/exec"
 URL_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqNEDayFNEgFoQqq-wF29BRkxF9u5YIrPYac54o3_hy3O5MvuQiQiwKKQ9oSlkx08JnXeN-mPu95Qk/pub?output=csv"
 
@@ -19,14 +19,15 @@ st.markdown("""
     <style>
     .stApp { background-color: #0a192f; color: white; }
     .main-title { color: #f1c40f; text-align: center; font-size: 3rem; font-weight: bold; margin-top: -50px; }
-    .sub-title { color: #ffffff; text-align: center; font-size: 1.5rem; margin-bottom: 30px; }
+    .sub-title { color: #ffffff; text-align: center; font-size: 1.8rem; margin-bottom: 30px; }
+    .stat-card { background-color: #1a2a4a; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #f1c40f; }
     </style>
     """, unsafe_allow_html=True)
 
 st.markdown('<div class="main-title">منظومة وجبات رمضان 🌙</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">إفطاراً شهياً - مدينة زويل</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">نتمنى لكم صوماً مقبولاً وإفطاراً شهياً</div>', unsafe_allow_html=True)
 
-# دالة إرسال الإيميل (SMTP)
+# دالة إرسال الإيميل
 def send_code(receiver_email, code):
     try:
         sender = st.secrets["my_email"]
@@ -42,16 +43,16 @@ def send_code(receiver_email, code):
     except Exception as e:
         return str(e)
 
-tab1, tab2 = st.tabs(["📝 تسجيل حجز جديد", "🔐 لوحة الإدارة"])
+tab1, tab2 = st.tabs(["📝 تسجيل حجز جديد", "🔐 لوحة الإدارة الذكية"])
 
-# --- تسجيل الطلاب ---
+# --- التبويب الأول: التسجيل ---
 with tab1:
     cairo_tz = pytz.timezone('Africa/Cairo')
     now = datetime.now(cairo_tz)
     is_open = (0 <= now.hour < 16) or (now.hour == 16 and now.minute < 30)
 
     if not is_open:
-        st.error(f"⛔ الحجز مغلق حالياً.")
+        st.error(f"⛔ الحجز مغلق حالياً. يفتح الحجز يومياً حتى الساعة 4:30 عصراً.")
     else:
         if 'otp' not in st.session_state: st.session_state.otp = ""
         if 'email_sent' not in st.session_state: st.session_state.email_sent = False
@@ -73,11 +74,10 @@ with tab1:
                             st.session_state.email_sent = True
                             st.rerun()
                         else: st.error(f"فشل الإرسال: {res}")
-                else: st.warning("تأكد من البيانات وإيميل الجامعة")
+                else: st.warning("تأكد من صحة البيانات وإيميل الجامعة الرسمي")
 
         if st.session_state.email_sent:
-            st.info("💡 افحص الـ Spam لو الكود متأخر")
-            user_code = st.text_input("ادخل الكود هنا")
+            user_code = st.text_input("ادخل الكود المكون من 4 أرقام")
             if st.button("تأكيد الحجز النهائي"):
                 if user_code == st.session_state.otp:
                     data = {"name": name, "id": student_id, "email": email, "location": location, "gender": gender, "room": room}
@@ -86,31 +86,55 @@ with tab1:
                             r = requests.post(URL_SCRIPT, json=data, timeout=25)
                             if r.json().get("result") == "success":
                                 st.balloons()
-                                st.success("🎉 تم الحجز بنجاح!")
+                                st.success("🎉 تم تسجيل حجزك بنجاح!")
                                 st.session_state.email_sent = False
-                            else: st.warning("أنت مسجل بالفعل اليوم")
-                        except: st.error("مشكلة في الاتصال")
-                else: st.error("الكود خطأ")
+                            else: st.warning("أنت مسجل بالفعل لهذا اليوم")
+                        except: st.error("مشكلة في الاتصال بالسيرفر")
+                else: st.error("الكود غير صحيح")
 
-# --- لوحة الإدمن (تظليل الاستلام) ---
+# --- التبويب الثاني: لوحة الإدارة ---
 with tab2:
-    pw = st.text_input("كلمة السر", type="password")
+    pw = st.text_input("كلمة السر للمسؤول", type="password")
     if pw == "Zewail2026":
-        if st.button("🔄 تحديث الجدول"):
+        st.write("### 📊 إحصائيات الوجبات الحالية")
+        
+        if st.button("🔄 تحديث البيانات"):
             try:
                 df = pd.read_csv(URL_SHEET_CSV)
+                
+                # حساب الإحصائيات
+                total_meals = len(df)
+                # استخدام اسم العمود الصحيح بناءً على الترتيب (العمود الخامس E هو مكان الاستلام)
+                # لو الشيت مفيهوش عناوين واضحة، بنستخدم index الأعمدة
+                stats = df.iloc[:, 4].value_counts() # العمود رقم 5 (index 4) هو مكان الاستلام
+                
+                # عرض الإحصائيات في كروت
+                col_total, col1, col2, col3 = st.columns(4)
+                with col_total:
+                    st.markdown(f'<div class="stat-card"><h3>الإجمالي</h3><h2>{total_meals}</h2></div>', unsafe_allow_html=True)
+                with col1:
+                    st.markdown(f'<div class="stat-card"><h6>القرية</h6><h2>{stats.get("عماير القرية الكونية", 0)}</h2></div>', unsafe_allow_html=True)
+                with col2:
+                    st.markdown(f'<div class="stat-card"><h6>الفيروز</h6><h2>{stats.get("الفيروز / المنطقة التالتة", 0)}</h2></div>', unsafe_allow_html=True)
+                with col3:
+                    st.markdown(f'<div class="stat-card"><h6>السكن</h6><h2>{stats.get("سكن الجامعة (Dorms)", 0)}</h2></div>', unsafe_allow_html=True)
+                
+                st.markdown("---")
+                st.write("#### كشف الأسماء التفصيلي")
                 st.dataframe(df, use_container_width=True)
-            except: st.error("فشل تحميل البيانات")
+                
+            except Exception as e:
+                st.error(f"خطأ في جلب البيانات: {str(e)}")
 
         st.markdown("---")
         st.write("### ✅ تأكيد الاستلام (تظليل)")
-        rec_id = st.text_input("ادخل ID الطالب")
-        if st.button("تأكيد استلام الوجبة"):
+        rec_id = st.text_input("ادخل ID الطالب للتظليل")
+        if st.button("تأكيد استلام"):
             if rec_id:
-                with st.spinner("جاري التظليل..."):
+                with st.spinner("جاري التحديث..."):
                     try:
                         res = requests.post(URL_SCRIPT, json={"action": "mark_received", "student_id": rec_id})
                         if res.json().get("result") == "success":
-                            st.success(f"✅ تم تظليل الطالب {rec_id} بنجاح.")
-                        else: st.error("ID غير موجود")
+                            st.success(f"✅ تم تظليل الطالب {rec_id} بنجاح كـ 'مستلم'.")
+                        else: st.error("الرقم الجامعي غير موجود")
                     except: st.error("فشل الاتصال")
